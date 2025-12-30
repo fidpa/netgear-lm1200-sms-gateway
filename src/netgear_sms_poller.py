@@ -1,13 +1,13 @@
-#!/usr/bin/env python3
+# Copyright (c) 2025 Marc Allgeier (fidpa)
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2025 fidpa <https://github.com/fidpa>
+# https://github.com/fidpa/netgear-lm1200-sms-gateway
 """
 Netgear LM1200 SMS Poller (Authenticated API Version)
 
 Polls LM1200 modem for incoming SMS messages and forwards them via Telegram.
 Stores SMS locally in monthly-rotated JSON files for backup/history.
 
-Version: 1.0.0 - Initial Release
+Version: 1.0.2 - Initial Release
 
 Use Case: Automatically forward 2FA/OTP codes via Telegram
 

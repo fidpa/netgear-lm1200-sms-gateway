@@ -1,13 +1,15 @@
 #!/bin/bash
+# Copyright (c) 2025 Marc Allgeier (fidpa)
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2025 fidpa <https://github.com/fidpa>
+# https://github.com/fidpa/netgear-lm1200-sms-gateway
 #
 # Netgear LM1200 SMS Poller - Telegram Forwarding Wrapper
 # Delegates SMS polling to Python, handles Telegram alerts
 #
-# Version: 1.0.0 - Public Release
+# Version: 1.0.2 - Public Release
 #
 # Changelog:
+#  - v1.0.2 (30.12.2025): Source-Code Header standardization
 #  - v1.0.0 (30.12.2025): Public release
 #    - Python handles: SMS fetch, state management, JSON storage
 #    - Bash handles: Telegram forwarding (optional)

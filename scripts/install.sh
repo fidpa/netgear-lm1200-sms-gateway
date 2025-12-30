@@ -1,9 +1,9 @@
 #!/bin/bash
+# Copyright (c) 2025 Marc Allgeier (fidpa)
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2025 fidpa <https://github.com/fidpa>
-# Simple installation helper for netgear-lm1200-sms-gateway
+# https://github.com/fidpa/netgear-lm1200-sms-gateway
 #
-# Version: 1.0.0
+# Version: 1.0.2
 # Created: 2025-12-30
 
 set -euo pipefail
