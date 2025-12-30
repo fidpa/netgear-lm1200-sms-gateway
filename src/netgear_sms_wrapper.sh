@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 fidpa <https://github.com/fidpa>
 #
 # Netgear LM1200 SMS Poller - Telegram Forwarding Wrapper
 # Delegates SMS polling to Python, handles Telegram alerts

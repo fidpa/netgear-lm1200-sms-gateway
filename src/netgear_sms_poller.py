@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 fidpa <https://github.com/fidpa>
 """
 Netgear LM1200 SMS Poller (Authenticated API Version)
 

@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 fidpa <https://github.com/fidpa>
 # Simple installation helper for netgear-lm1200-sms-gateway
 #
 # Version: 1.0.0
