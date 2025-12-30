@@ -1,0 +1,130 @@
+# Netgear LM1200 SMS Gateway
+
+Automated SMS reception and forwarding for Netgear LM1200 4G LTE Modem.
+
+## ⚡ Features
+
+- 📱 Automatic SMS polling (every 5 minutes via systemd timer)
+- 📨 Optional Telegram forwarding for 2FA/OTP codes
+- 💾 Local JSON storage (monthly rotated files)
+- 🔄 State management (no duplicates, no lost messages)
+- 🐍 Python 3.10+ with async/await
+- 🔒 systemd security hardening
+
+## 🚨 Critical: Germany-Specific Setup
+
+**IMPORTANT**: SMS reception requires specific modem configuration:
+
+1. ✅ Network Mode: "Auto" (NOT "LTE Only"!)
+2. ✅ SMS Alerts: Enabled in modem settings
+
+Without these settings, SMS will NOT be received. See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for details.
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Netgear LM1200 4G LTE Modem with active SIM card
+- Linux system with Python 3.10+ and systemd
+- (Optional) Telegram Bot Token for SMS forwarding
+
+### Installation
+
+1. Clone repository:
+   ```bash
+   git clone https://github.com/fidpa/netgear-lm1200-sms-gateway
+   cd netgear-lm1200-sms-gateway
+   ```
+
+2. Install dependencies:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+3. Configure modem (CRITICAL!):
+   - Open modem web UI: http://192.168.0.201
+   - Set Network Mode to "Auto" (Network → LTE Settings → Band Selection)
+   - Enable SMS Alerts (Settings → General → Alerts → "On")
+
+4. Create configuration:
+   ```bash
+   sudo mkdir -p /etc/netgear-sms-gateway
+   sudo cp config/config.example.env /etc/netgear-sms-gateway/config.env
+   sudo nano /etc/netgear-sms-gateway/config.env
+   ```
+
+5. Install systemd units:
+   ```bash
+   sudo cp systemd/*.{service,timer} /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now netgear-sms-poller.timer
+   ```
+
+6. Test:
+   ```bash
+   # Send test SMS to modem SIM card
+   # Wait 5 minutes or trigger manually:
+   sudo systemctl start netgear-sms-poller.service
+
+   # Check logs:
+   journalctl -u netgear-sms-poller.service -n 50
+   ```
+
+## 📖 Documentation
+
+- [Setup Guide](docs/SETUP.md) - Detailed installation & configuration
+- [API Reference](docs/API_REFERENCE.md) - Complete API documentation
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues & solutions
+
+## 🔧 Configuration
+
+### Minimal (SMS Storage Only)
+
+```env
+# /etc/netgear-sms-gateway/config.env
+NETGEAR_IP=192.168.0.201
+NETGEAR_ADMIN_PASSWORD=your_admin_password
+SMS_STATE_DIR=/var/lib/netgear-sms-gateway
+```
+
+### Optional (With Telegram Forwarding)
+
+```env
+TELEGRAM_BOT_TOKEN=123456789:ABC...
+TELEGRAM_CHAT_ID=12345678
+TELEGRAM_PREFIX="[SMS Gateway]"
+RATE_LIMIT_SECONDS=300
+```
+
+## 🛡️ Security Considerations
+
+- Credentials stored in `/etc/netgear-sms-gateway/config.env` (chmod 600)
+- systemd sandboxing: ProtectSystem=strict, PrivateTmp=yes
+- SMS content stored in `/var/lib/netgear-sms-gateway/` (restricted access)
+
+## 📊 Use Cases
+
+- ✅ 2FA/OTP code reception (banking, services)
+- ✅ Automated SMS backup/archival
+- ✅ SMS-to-Telegram bridge for mobile access
+- ✅ Home automation SMS triggers
+
+## 🤝 Contributing
+
+Contributions welcome! Please open an issue or pull request.
+
+## 📜 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## 🔗 Related Projects
+
+- [svbnet/netgear-sms](https://github.com/svbnet/netgear-sms) - SMS API for Netgear LTE modems
+- [Home Assistant NETGEAR LTE Integration](https://www.home-assistant.io/integrations/netgear_lte/)
+
+---
+
+**Created**: 2025-12-30
+**Status**: Production Ready

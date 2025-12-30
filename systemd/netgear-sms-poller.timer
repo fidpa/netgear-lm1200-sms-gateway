@@ -1,0 +1,14 @@
+[Unit]
+Description=Netgear LM1200 SMS Poller Timer (5min)
+Documentation=https://github.com/fidpa/netgear-lm1200-sms-gateway
+
+[Timer]
+# Run every 5 minutes
+OnBootSec=2min
+OnUnitActiveSec=5min
+
+# Persistent across reboots
+Persistent=true
+
+[Install]
+WantedBy=timers.target

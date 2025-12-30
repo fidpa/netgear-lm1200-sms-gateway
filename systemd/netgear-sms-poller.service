@@ -1,0 +1,37 @@
+[Unit]
+Description=Netgear LM1200 SMS Poller
+Documentation=https://github.com/fidpa/netgear-lm1200-sms-gateway
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+SuccessExitStatus=0 1 2 130
+User=YOUR_USERNAME
+Group=YOUR_USERNAME
+
+# Environment
+EnvironmentFile=/etc/netgear-sms-gateway/config.env
+
+# Execute SMS poller via symlink
+ExecStart=/usr/local/bin/netgear-sms-poller
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sms-poller
+
+# Security
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/netgear-sms-gateway
+
+# Timeout
+TimeoutStartSec=120s
+
+[Install]
+WantedBy=multi-user.target
