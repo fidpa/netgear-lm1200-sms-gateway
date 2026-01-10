@@ -1,5 +1,9 @@
 # Netgear LM1200 SMS Gateway
 
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+![Python](https://img.shields.io/badge/Python-3.10%2B-yellow?logo=python)
+![Netgear LM1200](https://img.shields.io/badge/Netgear-LM1200-blue)
+
 Automated SMS reception and forwarding for Netgear LM1200 4G LTE Modem.
 
 ## ⚡ Features
