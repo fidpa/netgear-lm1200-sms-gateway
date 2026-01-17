@@ -6,9 +6,15 @@
 # Netgear LM1200 SMS Poller - Telegram Forwarding Wrapper
 # Delegates SMS polling to Python, handles Telegram alerts
 #
-# Version: 1.0.2 - Public Release
+# Version: 1.0.3 - Bug-Fix Release
 #
 # Changelog:
+#  - v1.0.3 (17.01.2026): Bug-fixes from Codex audit
+#    - Fixed venv path (src/venv → ../venv) for symlink compatibility
+#    - Added jq as mandatory prerequisite
+#    - Marked symlink as REQUIRED in setup guide
+#    - Removed unimplemented LOG_LEVEL config
+#    - Improved Quick-Start with service user setup
 #  - v1.0.2 (30.12.2025): Source-Code Header standardization
 #  - v1.0.0 (30.12.2025): Public release
 #    - Python handles: SMS fetch, state management, JSON storage
@@ -36,11 +42,11 @@ if ! SCRIPT_NAME="$(basename "$0" .sh)"; then
 fi
 readonly SCRIPT_NAME
 
-readonly SCRIPT_VERSION="1.0.0"
+readonly SCRIPT_VERSION="1.0.3"
 
-# Python script in same directory (uses venv)
+# Python script in same directory (uses venv in repo root)
 readonly PYTHON_SCRIPT="${SCRIPT_DIR}/netgear_sms_poller.py"
-readonly PYTHON_VENV="${SCRIPT_DIR}/venv/bin/python"
+readonly PYTHON_VENV="${SCRIPT_DIR}/../venv/bin/python"
 
 # State directory (configurable via environment)
 readonly STATE_DIR="${SMS_STATE_DIR:-/var/lib/netgear-sms-gateway}"

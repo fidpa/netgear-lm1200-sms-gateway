@@ -16,7 +16,6 @@ The Netgear LM1200 LTE modem can receive SMS, even though no SMS UI is available
 - Automatically forwards new SMS via Telegram (ideal for 2FA/OTP codes)
 - Stores SMS locally in monthly rotated JSON files (backup/history)
 - Uses state management (no duplicates, no lost SMS)
-- Optional Vaultwarden integration for secure credential management
 
 **Use Case**: Automatically receive 2FA/OTP codes from banking, services etc. on Telegram, even when away from home.
 
@@ -34,7 +33,17 @@ The Netgear LM1200 LTE modem can receive SMS, even though no SMS UI is available
 ### Software
 - Python 3.10+ with aiohttp (installed via venv)
 - systemd (already present)
+- `jq` command-line JSON processor (for SMS parsing)
 - Optional: Telegram Bot Token for SMS forwarding
+
+**Install jq:**
+```bash
+# Debian/Ubuntu
+sudo apt install jq
+
+# RHEL/Fedora
+sudo dnf install jq
+```
 
 ### Credentials
 - **NETGEAR_ADMIN_PASSWORD**: Admin password for LM1200
@@ -163,11 +172,15 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now netgear-sms-poller.timer
 ```
 
-### 7. Create Symlink (Optional)
+### 7. Create Symlink (REQUIRED)
+
+**⚠️ The systemd service expects the wrapper at `/usr/local/bin/netgear-sms-poller`!**
 
 ```bash
 sudo ln -sf "$(pwd)/src/netgear_sms_wrapper.sh" /usr/local/bin/netgear-sms-poller
 ```
+
+Alternative: Adjust `ExecStart` in `/etc/systemd/system/netgear-sms-poller.service` to point to the full path of `src/netgear_sms_wrapper.sh`.
 
 ---
 

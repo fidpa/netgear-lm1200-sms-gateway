@@ -30,7 +30,17 @@ Without these settings, SMS will NOT be received. See [docs/TROUBLESHOOTING.md](
 
 - Netgear LM1200 4G LTE Modem with active SIM card
 - Linux system with Python 3.10+ and systemd
+- `jq` command-line JSON processor (for SMS parsing)
 - (Optional) Telegram Bot Token for SMS forwarding
+
+Install `jq`:
+```bash
+# Debian/Ubuntu
+sudo apt install jq
+
+# RHEL/Fedora
+sudo dnf install jq
+```
 
 ### Installation
 
@@ -62,11 +72,22 @@ Without these settings, SMS will NOT be received. See [docs/TROUBLESHOOTING.md](
 5. Install systemd units:
    ```bash
    sudo cp systemd/*.{service,timer} /etc/systemd/system/
+
+   # IMPORTANT: Edit service file and replace YOUR_USERNAME with your actual username
+   sudo nano /etc/systemd/system/netgear-sms-poller.service
+   # Change: User=YOUR_USERNAME → User=yourname
+   # Change: Group=YOUR_USERNAME → Group=yourname
+
    sudo systemctl daemon-reload
    sudo systemctl enable --now netgear-sms-poller.timer
    ```
 
-6. Test:
+6. Create symlink (REQUIRED):
+   ```bash
+   sudo ln -sf "$(pwd)/src/netgear_sms_wrapper.sh" /usr/local/bin/netgear-sms-poller
+   ```
+
+7. Test:
    ```bash
    # Send test SMS to modem SIM card
    # Wait 5 minutes or trigger manually:

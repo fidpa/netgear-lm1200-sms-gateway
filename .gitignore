@@ -30,3 +30,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Personal content
+LINKEDIN_POST.md
+REDDIT_POST.md
