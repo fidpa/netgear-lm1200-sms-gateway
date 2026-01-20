@@ -34,3 +34,6 @@ Thumbs.db
 # Personal content
 LINKEDIN_POST.md
 REDDIT_POST.md
+
+# Nextcloud/Rclone symlinks
+*.rclonelink
