@@ -1,10 +1,14 @@
 # Netgear LM1200 SMS Gateway
 
-![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
-![Python](https://img.shields.io/badge/Python-3.10%2B-yellow?logo=python)
-![Netgear LM1200](https://img.shields.io/badge/Netgear-LM1200-blue)
+[![Release](https://img.shields.io/github/v/release/fidpa/netgear-lm1200-sms-gateway?style=flat-square)](https://github.com/fidpa/netgear-lm1200-sms-gateway/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Platform](https://img.shields.io/badge/Platform-Linux-orange?style=flat-square&logo=linux&logoColor=white)](https://www.linux.org/)
+[![Netgear LM1200](https://img.shields.io/badge/Netgear-LM1200-blue?style=flat-square)](https://www.netgear.com/home/mobile-wifi/lte-modems/lm1200/)
+[![Maintenance](https://img.shields.io/badge/Maintained-yes-brightgreen?style=flat-square)](https://github.com/fidpa/netgear-lm1200-sms-gateway/commits/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
 
-Automated SMS reception and forwarding for Netgear LM1200 4G LTE Modem.
+> Automated SMS reception and forwarding for Netgear LM1200 4G LTE Modem — 2FA/OTP codes directly to Telegram.
 
 ## ⚡ Features
 
@@ -99,6 +103,7 @@ sudo dnf install jq
 
 ## 📖 Documentation
 
+- [Documentation Index](docs/README.md) - Overview & quick links
 - [Setup Guide](docs/SETUP.md) - Detailed installation & configuration
 - [API Reference](docs/API_REFERENCE.md) - Complete API documentation
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues & solutions
@@ -123,11 +128,13 @@ TELEGRAM_PREFIX="[SMS Gateway]"
 RATE_LIMIT_SECONDS=300
 ```
 
-## 🛡️ Security Considerations
+## 🛡️ Security
 
 - Credentials stored in `/etc/netgear-sms-gateway/config.env` (chmod 600)
 - systemd sandboxing: ProtectSystem=strict, PrivateTmp=yes
 - SMS content stored in `/var/lib/netgear-sms-gateway/` (restricted access)
+
+For vulnerability reporting and security best practices, see [SECURITY.md](SECURITY.md).
 
 ## 📊 Use Cases
 
@@ -138,7 +145,7 @@ RATE_LIMIT_SECONDS=300
 
 ## 🤝 Contributing
 
-Contributions welcome! Please open an issue or pull request.
+Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## 📜 License
 
@@ -148,8 +155,3 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 - [svbnet/netgear-sms](https://github.com/svbnet/netgear-sms) - SMS API for Netgear LTE modems
 - [Home Assistant NETGEAR LTE Integration](https://www.home-assistant.io/integrations/netgear_lte/)
-
----
-
-**Created**: 2025-12-30
-**Status**: Production Ready
