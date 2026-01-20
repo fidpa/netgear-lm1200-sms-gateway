@@ -2,6 +2,7 @@
 
 [![Release](https://img.shields.io/github/v/release/fidpa/netgear-lm1200-sms-gateway?style=flat-square)](https://github.com/fidpa/netgear-lm1200-sms-gateway/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
+[![CI](https://github.com/fidpa/netgear-lm1200-sms-gateway/actions/workflows/lint.yml/badge.svg)](https://github.com/fidpa/netgear-lm1200-sms-gateway/actions/workflows/lint.yml)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-orange?style=flat-square&logo=linux&logoColor=white)](https://www.linux.org/)
 [![Netgear LM1200](https://img.shields.io/badge/Netgear-LM1200-blue?style=flat-square)](https://www.netgear.com/home/mobile-wifi/lte-modems/lm1200/)

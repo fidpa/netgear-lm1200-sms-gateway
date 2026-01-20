@@ -464,7 +464,7 @@ def show_status() -> int:
     print(f"Last SMS: {last_sms_str}")
 
     if state.latest_sms:
-        print(f"\nLatest SMS:")
+        print("\nLatest SMS:")
         print(f"  From: {state.latest_sms.get('number', 'N/A')}")
         print(f"  Time: {state.latest_sms.get('time', 'N/A')}")
         print(f"  Text: {state.latest_sms.get('content', 'N/A')[:50]}...")
