@@ -7,16 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- CI/CD pipeline with GitHub Actions
-- ShellCheck linting for Bash scripts
-- Ruff linting for Python code
-- Automated syntax validation
-- Automated GitHub Releases via tags
+## [1.2.1] - 2026-01-22
+
+### Fixed
+- Ruff linting: Unused variable in modem reachability check (`response` → `_`)
+
+### Changed
+- README: Updated badge layout (removed redundant GitHub Stars badge)
 
 ## [1.2.0] - 2026-01-21
 
 ### Added
+- **CI/CD pipeline with GitHub Actions**
+  - ShellCheck linting for Bash scripts
+  - Ruff linting for Python code
+  - Automated syntax validation
+  - Automated GitHub Releases via tags
 - **Encrypted SMS Storage** - Optional AES-256 encryption for SMS content (#1)
   - New CLI mode: `generate-key` for encryption key generation
   - Hybrid state support: plaintext and encrypted SMS coexist

@@ -880,7 +880,7 @@ async def health_check() -> int:
             jar = aiohttp.CookieJar(unsafe=True)
             timeout = aiohttp.ClientTimeout(total=5)
             async with aiohttp.ClientSession(cookie_jar=jar, timeout=timeout) as session:
-                async with session.get(f"http://{NETGEAR_IP}/", allow_redirects=False) as response:
+                async with session.get(f"http://{NETGEAR_IP}/", allow_redirects=False) as _:
                     pass  # Any HTTP response = modem reachable
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             print(f"DEGRADED: Modem unreachable ({e})")

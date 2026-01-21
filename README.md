@@ -8,7 +8,6 @@
 [![Netgear LM1200](https://img.shields.io/badge/Netgear-LM1200-blue?style=flat-square)](https://www.netgear.com/home/mobile-wifi/lte-modems/lm1200/)
 [![Maintenance](https://img.shields.io/badge/Maintained-yes-brightgreen?style=flat-square)](https://github.com/fidpa/netgear-lm1200-sms-gateway/commits/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
-![GitHub Stars](https://img.shields.io/github/stars/fidpa/netgear-lm1200-sms-gateway?style=social)
 ![Last Commit](https://img.shields.io/github/last-commit/fidpa/netgear-lm1200-sms-gateway)
 
 > Automated SMS reception and forwarding for Netgear LM1200 4G LTE Modem — 2FA/OTP codes directly to Telegram.
