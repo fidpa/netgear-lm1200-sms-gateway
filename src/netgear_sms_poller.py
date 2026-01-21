@@ -7,7 +7,7 @@ Netgear LM1200 SMS Poller (Authenticated API Version)
 Polls LM1200 modem for incoming SMS messages and forwards them via Telegram.
 Stores SMS locally in monthly-rotated JSON files for backup/history.
 
-Version: 1.1.1 - Bug-Fix Release (Codex Audit)
+Version: 1.2.0 - Feature Release (Encryption, Retry, Health Check)
 
 Use Case: Automatically forward 2FA/OTP codes via Telegram
 
@@ -50,12 +50,29 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import Callable, Any
 
 import aiohttp
 
-# Configure logging
+# Optional: cryptography for encryption (graceful degradation)
+try:
+    from cryptography.fernet import Fernet, InvalidToken
+    ENCRYPTION_AVAILABLE = True
+except ImportError:
+    ENCRYPTION_AVAILABLE = False
+    Fernet = None
+    InvalidToken = None
+
+# Configure logging (support LOG_LEVEL env var)
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+
+if LOG_LEVEL not in VALID_LOG_LEVELS:
+    print(f"WARNING: Invalid LOG_LEVEL='{LOG_LEVEL}', using INFO", file=sys.stderr)
+    LOG_LEVEL = "INFO"
+
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, LOG_LEVEL),
     format='%(message)s',  # Simple format, bash wrapper adds prefixes
     stream=sys.stdout
 )
@@ -71,6 +88,99 @@ LOGIN_URL = f"http://{NETGEAR_IP}/Forms/config"
 STATE_DIR = os.getenv("SMS_STATE_DIR", "/var/lib/netgear-sms-gateway")
 STATE_FILE = Path(STATE_DIR) / "sms-poller-state.json"
 SMS_STORAGE_DIR = Path(STATE_DIR)
+
+# ============================================================================
+# Configuration Constants
+# ============================================================================
+
+# HTTP Timeouts (seconds)
+HTTP_TIMEOUT_SECONDS = 10  # API requests (login, SMS fetch)
+
+# Hash List Management (deduplication)
+HASH_LIST_MAX_SIZE = 1000    # Trigger cleanup when exceeded
+HASH_LIST_TRIM_SIZE = 500    # Keep most recent N hashes after cleanup
+
+# ============================================================================
+# Retry Logic Functions
+# ============================================================================
+
+def is_transient_error(error: Exception) -> bool:
+    """
+    Classify error as transient (retry-worthy) or permanent.
+
+    Transient: Network timeouts, connection refused, 503/429
+    Permanent: 401/404, JSON decode, authentication failures
+    """
+    # Network-level transient errors
+    if isinstance(error, (
+        aiohttp.ClientConnectorError,  # Connection refused, DNS
+        aiohttp.ServerTimeoutError,    # Request timeout
+        asyncio.TimeoutError,          # Generic timeout
+    )):
+        return True
+
+    # HTTP status-based classification
+    if isinstance(error, aiohttp.ClientResponseError):
+        return error.status in [503, 429]  # Service Unavailable, Rate Limit
+
+    # Permanent errors
+    if isinstance(error, json.JSONDecodeError):
+        return False  # API format changed
+
+    if isinstance(error, Exception):
+        # Authentication failures are permanent
+        if "authentication failed" in str(error).lower():
+            return False
+        if "No security token" in str(error):
+            return False
+
+    # Default: treat unknown errors as non-transient (safe default)
+    return False
+
+async def retry_with_backoff(
+    func: Callable,
+    max_attempts: int = 3,
+    initial_delay: float = 5.0,
+    max_delay: float = 60.0,
+    *args,
+    **kwargs
+) -> Any:
+    """
+    Retry async function with exponential backoff.
+
+    Only retries transient errors. Permanent errors fail immediately.
+    """
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return await func(*args, **kwargs)
+
+        except Exception as e:
+            is_last_attempt = (attempt == max_attempts)
+            is_transient = is_transient_error(e)
+
+            if is_last_attempt or not is_transient:
+                # Fail immediately if:
+                # - Last attempt reached
+                # - Permanent error (auth, JSON decode)
+                logger.error(f"Attempt {attempt}/{max_attempts} failed: {e}")
+                if not is_transient:
+                    logger.error("Error classified as permanent (no retry)")
+                raise
+
+            # Exponential backoff: 5s → 10s → 20s → ...
+            delay = min(initial_delay * (2 ** (attempt - 1)), max_delay)
+            logger.warning(
+                f"Attempt {attempt}/{max_attempts} failed (transient): {e}. "
+                f"Retrying in {delay}s..."
+            )
+            await asyncio.sleep(delay)
+
+            # Check for shutdown signal during retry delay
+            if shutdown_requested:
+                logger.info("Shutdown requested during retry, aborting")
+                raise KeyboardInterrupt()
+
+    raise Exception("Retry logic exhausted")  # Should never reach
 
 # Global shutdown flag
 shutdown_requested = False
@@ -108,6 +218,56 @@ def compute_sms_hash(sms: SMSMessage) -> str:
     """
     hash_input = f"{sms.number}|{sms.time}|{sms.content}"
     return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()[:16]
+
+
+def get_encryption_key() -> bytes | None:
+    """Load encryption key from file or ENV. Returns None if disabled."""
+    if not ENCRYPTION_AVAILABLE:
+        if os.getenv("SMS_ENCRYPTION_ENABLED", "false").lower() == "true":
+            logger.warning("Encryption requested but cryptography module not available (install: pip install cryptography)")
+        return None
+
+    if not os.getenv("SMS_ENCRYPTION_ENABLED", "false").lower() == "true":
+        return None
+
+    # Try key file first (primary method)
+    key_file = Path(os.getenv("SMS_ENCRYPTION_KEY_FILE",
+                             "/etc/netgear-sms-gateway/.encryption.key"))
+    if key_file.exists():
+        try:
+            return key_file.read_bytes().strip()
+        except OSError as e:
+            logger.error(f"Failed to read encryption key file: {e}")
+            raise
+
+    # Fallback to ENV var (for systemd secrets)
+    key_env = os.getenv("SMS_ENCRYPTION_KEY")
+    if key_env:
+        return key_env.encode('utf-8')
+
+    raise Exception("SMS_ENCRYPTION_ENABLED=true but no key found")
+
+def encrypt_sms_content(content: str, key: bytes | None) -> str:
+    """Encrypt SMS content using Fernet. Returns plaintext if key is None."""
+    if key is None:
+        return content
+
+    fernet = Fernet(key)
+    encrypted = fernet.encrypt(content.encode('utf-8'))
+    return f"ENC:{encrypted.decode('ascii')}"  # Prefix for detection
+
+def decrypt_sms_content(content: str, key: bytes | None) -> str:
+    """Decrypt SMS content if encrypted (ENC: prefix). Handles plaintext gracefully."""
+    if key is None or not content.startswith("ENC:"):
+        return content  # Plaintext or encryption disabled
+
+    try:
+        fernet = Fernet(key)
+        encrypted = content[4:].encode('ascii')  # Remove ENC: prefix
+        return fernet.decrypt(encrypted).decode('utf-8')
+    except InvalidToken:
+        logger.error("Decryption failed: Invalid key or corrupted data")
+        raise
 
 
 def compute_sms_hash_dict(msg: dict) -> str:
@@ -182,8 +342,8 @@ class SMSPollerState:
     latest_sms: dict[str, str] = field(default_factory=dict)
     processed_hashes: list[str] = field(default_factory=list)
 
-    def update_with_new_sms(self, sms: SMSMessage) -> None:
-        """Update state with newly received SMS."""
+    def update_with_new_sms(self, sms: SMSMessage, encryption_key: bytes | None) -> None:
+        """Update state with newly received SMS (encrypted)."""
         sms_hash = compute_sms_hash(sms)
 
         # Update ID tracking
@@ -193,20 +353,20 @@ class SMSPollerState:
         # Add hash to processed set (with size limit)
         if sms_hash not in self.processed_hashes:
             self.processed_hashes.append(sms_hash)
-            # Prevent unbounded growth: when exceeding 1000, truncate to 500 most recent
-            # This provides ~500 buffer before next truncation (hysteresis pattern)
-            if len(self.processed_hashes) > 1000:
-                self.processed_hashes = self.processed_hashes[-500:]
+            # Prevent unbounded growth: when exceeding max, truncate to trim size
+            # This provides buffer before next truncation (hysteresis pattern)
+            if len(self.processed_hashes) > HASH_LIST_MAX_SIZE:
+                self.processed_hashes = self.processed_hashes[-HASH_LIST_TRIM_SIZE:]
 
         # Update timestamps and counters
         self.last_check = time.time()
         self.total_sms_received += 1
         self.last_sms_timestamp = time.time()
-        # Store latest SMS for Telegram forwarding
+        # Store latest SMS for Telegram forwarding (ENCRYPTED)
         self.latest_sms = {
             "number": sms.number,
             "time": sms.time,
-            "content": sms.content
+            "content": encrypt_sms_content(sms.content, encryption_key)
         }
 
     def mark_check(self) -> None:
@@ -242,7 +402,7 @@ async def get_api_data(session: aiohttp.ClientSession) -> dict:
     Raises:
         Exception: On HTTP error or invalid response
     """
-    async with session.get(API_URL, allow_redirects=True, timeout=10) as response:
+    async with session.get(API_URL, allow_redirects=True, timeout=HTTP_TIMEOUT_SECONDS) as response:
         if response.status == 200:
             # LM1200 returns JSON with text/plain content-type, parse manually
             text = await response.text()
@@ -280,7 +440,7 @@ async def login(session: aiohttp.ClientSession) -> bool:
     }
 
     async with session.post(LOGIN_URL, data=login_data,
-                           allow_redirects=False, timeout=10) as response:
+                           allow_redirects=False, timeout=HTTP_TIMEOUT_SECONDS) as response:
         # Accept 200, 204 (No Content - success), or 302 (redirect)
         if response.status not in [200, 204, 302]:
             response_text = await response.text()
@@ -336,12 +496,13 @@ async def fetch_sms_list(session: aiohttp.ClientSession) -> list[SMSMessage]:
         logger.error(f"SMS data not found in API response: {e}")
         return []
 
-def save_sms_to_json(sms_list: list[SMSMessage]) -> bool:
+def save_sms_to_json(sms_list: list[SMSMessage], encryption_key: bytes | None) -> bool:
     """
-    Save SMS to monthly-rotated JSON file.
+    Save SMS to monthly-rotated JSON file (encrypted).
 
     Args:
         sms_list: List of SMS messages to save
+        encryption_key: Fernet key for encryption (None = plaintext)
 
     Returns:
         bool: True if save successful
@@ -349,6 +510,7 @@ def save_sms_to_json(sms_list: list[SMSMessage]) -> bool:
     Notes:
         Format: /var/lib/netgear-sms-gateway/sms-inbox-YYYY-MM.json
         Appends to existing file (keeps history)
+        SMS content is encrypted if key provided (ENC: prefix)
     """
     if not sms_list:
         return True
@@ -370,8 +532,12 @@ def save_sms_to_json(sms_list: list[SMSMessage]) -> bool:
                 logger.warning(f"Corrupted SMS file {sms_file}, starting fresh")
                 existing_sms = []
 
-        # Convert SMSMessage to dict
-        new_sms = [asdict(sms) for sms in sms_list]
+        # Convert SMSMessage to dict + encrypt content
+        new_sms = []
+        for sms in sms_list:
+            sms_dict = asdict(sms)
+            sms_dict['content'] = encrypt_sms_content(sms_dict['content'], encryption_key)
+            new_sms.append(sms_dict)
 
         # Merge (avoid duplicates by content hash - robust against ID reset)
         existing_hashes = {compute_sms_hash_dict(msg) for msg in existing_sms}
@@ -496,18 +662,47 @@ async def poll_sms() -> int:
                 f"Max ID seen: {state.max_sms_id_seen}, "
                 f"Hashes tracked: {len(state.processed_hashes)}")
 
+    # Load encryption key (if enabled)
+    encryption_key = get_encryption_key()
+    if encryption_key:
+        logger.info("Encryption enabled")
+
+    # Load retry config from ENV
+    retry_enabled = os.getenv("SMS_RETRY_ENABLED", "true").lower() == "true"
+    max_attempts = int(os.getenv("SMS_RETRY_MAX_ATTEMPTS", "3"))
+    initial_delay = float(os.getenv("SMS_RETRY_INITIAL_DELAY", "5"))
+    max_delay = float(os.getenv("SMS_RETRY_MAX_DELAY", "60"))
+
     # Use CookieJar for session management (needed for authentication)
     jar = aiohttp.CookieJar(unsafe=True)
 
     try:
         async with aiohttp.ClientSession(cookie_jar=jar) as session:
-            # Login to get authenticated session
-            logger.info("Logging in to modem...")
-            await login(session)
-            logger.info("Login successful")
+            # Wrap login + fetch in retry logic (if enabled)
+            if retry_enabled:
+                logger.info(f"Retry enabled: max_attempts={max_attempts}")
 
-            # Fetch SMS list
-            sms_list = await fetch_sms_list(session)
+                async def login_and_fetch():
+                    """Combined operation for retry (login + fetch SMS)."""
+                    await login(session)
+                    logger.info("Login successful")
+                    return await fetch_sms_list(session)
+
+                sms_list = await retry_with_backoff(
+                    login_and_fetch,
+                    max_attempts=max_attempts,
+                    initial_delay=initial_delay,
+                    max_delay=max_delay
+                )
+            else:
+                # Original behavior (no retry)
+                logger.info("Retry disabled")
+                logger.info("Logging in to modem...")
+                await login(session)
+                logger.info("Login successful")
+
+                # Fetch SMS list
+                sms_list = await fetch_sms_list(session)
 
             # Check for shutdown signal after HTTP requests
             if shutdown_requested:
@@ -538,15 +733,15 @@ async def poll_sms() -> int:
             # Process new SMS
             logger.info(f"Found {len(new_sms)} new SMS")
 
-            # Save to monthly JSON file
-            if not save_sms_to_json(new_sms):
+            # Save to monthly JSON file (encrypted)
+            if not save_sms_to_json(new_sms, encryption_key):
                 logger.warning("Failed to save SMS to JSON archive (non-critical)")
 
-            # Update state with latest SMS (for Telegram forwarding)
+            # Update state with latest SMS (for Telegram forwarding, encrypted)
             # Process in order, update state with the LAST one
             for sms in new_sms:
                 logger.info(f"  SMS #{sms.id} from {sms.number}: {sms.content[:50]}...")
-                state.update_with_new_sms(sms)
+                state.update_with_new_sms(sms, encryption_key)
 
             # Save updated state
             if not save_state(state):
@@ -618,6 +813,84 @@ def reset_state() -> int:
         logger.error("Failed to reset state")
         return 1
 
+def generate_encryption_key() -> int:
+    """
+    Generate new Fernet encryption key for SMS storage.
+
+    Returns:
+        Exit code: 0 (always successful), 1 (cryptography not available)
+    """
+    if not ENCRYPTION_AVAILABLE:
+        print("ERROR: cryptography module not available")
+        print()
+        print("Install with:")
+        print("  pip install cryptography>=42.0.0")
+        print("  # or: apt install python3-cryptography")
+        return 1
+
+    key = Fernet.generate_key()
+
+    print("Generated Fernet encryption key:")
+    print(key.decode('ascii'))
+    print()
+    print("Save this key securely:")
+    print("  sudo sh -c 'echo \"<KEY>\" > /etc/netgear-sms-gateway/.encryption.key'")
+    print("  sudo chmod 600 /etc/netgear-sms-gateway/.encryption.key")
+    print()
+    print("Then enable encryption in config.env:")
+    print("  SMS_ENCRYPTION_ENABLED=true")
+
+    return 0
+
+async def health_check() -> int:
+    """
+    Perform health check and return status code.
+
+    Returns:
+        0: HEALTHY (recent check, state valid)
+        1: DEGRADED (stale state, minor issues)
+        2: DOWN (state missing/corrupt, modem unreachable)
+    """
+    # Configuration
+    stale_threshold = int(os.getenv("HEALTH_CHECK_STALE_THRESHOLD", "1800"))
+    ping_modem = os.getenv("HEALTH_CHECK_PING_MODEM", "false").lower() == "true"
+
+    # 1. Check state file existence and validity
+    if not STATE_FILE.exists():
+        print("DOWN: State file missing")
+        return 2
+
+    try:
+        state = load_state()
+    except Exception as e:
+        print(f"DOWN: State file corrupt ({e})")
+        return 2
+
+    # 2. Check state staleness (last_check timestamp)
+    now = time.time()
+    time_since_check = now - state.last_check
+
+    if time_since_check > stale_threshold:
+        print(f"DEGRADED: Stale state (last check {int(time_since_check)}s ago, threshold {stale_threshold}s)")
+        return 1
+
+    # 3. Optional: Ping modem to verify reachability
+    if ping_modem:
+        try:
+            jar = aiohttp.CookieJar(unsafe=True)
+            timeout = aiohttp.ClientTimeout(total=5)
+            async with aiohttp.ClientSession(cookie_jar=jar, timeout=timeout) as session:
+                async with session.get(f"http://{NETGEAR_IP}/", allow_redirects=False) as response:
+                    pass  # Any HTTP response = modem reachable
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            print(f"DEGRADED: Modem unreachable ({e})")
+            return 1
+
+    # All checks passed
+    last_check_ago = int(time_since_check)
+    print(f"HEALTHY: Last check {last_check_ago}s ago, {state.total_sms_received} SMS received")
+    return 0
+
 async def list_sms() -> int:
     """
     List all SMS in modem inbox (debug mode).
@@ -678,7 +951,7 @@ Examples:
 
     parser.add_argument(
         'action',
-        choices=['check', 'status', 'reset', 'list'],
+        choices=['check', 'status', 'reset', 'list', 'generate-key', 'health'],
         nargs='?',
         default='check',
         help='Action to perform (default: check)'
@@ -696,6 +969,10 @@ Examples:
             return reset_state()
         elif args.action == 'list':
             return asyncio.run(list_sms())
+        elif args.action == 'generate-key':
+            return generate_encryption_key()
+        elif args.action == 'health':
+            return asyncio.run(health_check())
         else:
             logger.error(f"Unknown action: {args.action}")
             return 1

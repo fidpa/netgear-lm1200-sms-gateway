@@ -14,6 +14,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automated syntax validation
 - Automated GitHub Releases via tags
 
+## [1.2.0] - 2026-01-21
+
+### Added
+- **Encrypted SMS Storage** - Optional AES-256 encryption for SMS content (#1)
+  - New CLI mode: `generate-key` for encryption key generation
+  - Hybrid state support: plaintext and encrypted SMS coexist
+  - Backward compatible: encryption disabled by default
+- **Retry Logic** - Exponential backoff for transient network errors (#2)
+  - Smart error classification: transient vs permanent
+  - Configurable: max attempts, delays via ENV vars
+  - Default: 3 attempts with 5s → 10s → 20s backoff
+- **Health Check Endpoint** - New CLI mode for monitoring integration (#3)
+  - Exit codes: 0 (healthy), 1 (degraded), 2 (down)
+  - Prometheus/Uptime Kuma compatible
+- **Configurable Log Level** - LOG_LEVEL ENV var support (#4)
+  - Levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  - Default: INFO (backward compatible)
+- **Magic Numbers as Constants** - Improved code readability (#5)
+  - HTTP_TIMEOUT_SECONDS, HASH_LIST_MAX_SIZE, HASH_LIST_TRIM_SIZE
+- **jq Prerequisite Check** - Explicit validation at startup (#6)
+  - Multi-distro installation instructions (apt, dnf, pacman)
+
+### Changed
+- **Encryption is now optional**: Gateway works without `cryptography` installed
+- Graceful degradation: All features work without encryption (retry, health check, etc.)
+- `requirements.txt`: `cryptography` commented out (optional dependency)
+
+### Documentation
+- New guide: docs/ENCRYPTION.md (encryption setup, key management)
+- New guide: docs/MONITORING.md (health check integration)
+- Updated: README.md (new features, advanced configuration)
+- Updated: config.example.env (all new ENV vars documented)
+
+### Migration Notes
+- No breaking changes, 100% backward compatible
+- All new features opt-in via ENV vars
+- Encryption: existing plaintext SMS remain readable
+
 ## [1.1.1] - 2026-01-21
 
 ### Fixed

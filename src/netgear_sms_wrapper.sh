@@ -160,10 +160,41 @@ cleanup() {
 trap cleanup SIGTERM SIGINT
 
 # ============================================================================
+# Prerequisite Checks
+# ============================================================================
+
+check_prerequisites() {
+    local missing_tools=()
+
+    # Check for jq (required for SMS JSON parsing)
+    if ! command -v jq >/dev/null 2>&1; then
+        missing_tools+=("jq")
+    fi
+
+    if [[ ${#missing_tools[@]} -gt 0 ]]; then
+        log_error "Missing required tools: ${missing_tools[*]}"
+        log_error ""
+        log_error "Install with:"
+        log_error "  Debian/Ubuntu: sudo apt install ${missing_tools[*]}"
+        log_error "  RHEL/Fedora:   sudo dnf install ${missing_tools[*]}"
+        log_error "  Arch Linux:    sudo pacman -S ${missing_tools[*]}"
+        return 1
+    fi
+
+    return 0
+}
+
+# ============================================================================
 # Main SMS Poller Logic
 # ============================================================================
 
 main() {
+    # Validate prerequisites before processing
+    if ! check_prerequisites; then
+        log_error "Prerequisite check failed, cannot continue"
+        return 1
+    fi
+
     log_info "=== Netgear LM1200 SMS Poller Check ==="
 
     # Run Python SMS poller
@@ -215,9 +246,26 @@ main() {
                 return 1
             fi
 
+            # Extract SMS content from state file
             if ! sms_content=$(jq -r '.latest_sms.content // ""' "$STATE_FILE" 2>/dev/null); then
                 log_error "Failed to extract SMS content from state file"
                 return 1
+            fi
+
+            # Decrypt if encrypted (detected by ENC: prefix)
+            if [[ "$sms_content" == ENC:* ]]; then
+                log_info "Decrypting SMS content"
+                local decrypted
+                if ! decrypted=$("$PYTHON_VENV" -c "
+import sys; sys.path.insert(0, '$(dirname "$PYTHON_SCRIPT")')
+from netgear_sms_poller import decrypt_sms_content, get_encryption_key
+key = get_encryption_key()
+print(decrypt_sms_content('$sms_content', key))
+" 2>&1); then
+                    log_error "Failed to decrypt SMS content: $decrypted"
+                    return 1
+                fi
+                sms_content="$decrypted"
             fi
 
             # Format Telegram message

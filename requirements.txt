@@ -1,1 +1,4 @@
 aiohttp>=3.9.0
+
+# Optional dependencies (install if you want encryption support)
+# cryptography>=42.0.0  # Uncomment for SMS encryption feature

@@ -22,6 +22,9 @@
 - 🔒 Hash-based deduplication (robust against ID resets)
 - 🐍 Python 3.10+ with async/await
 - 🔒 systemd security hardening
+- 🔐 **Optional SMS Encryption** (AES-256 via Fernet)
+- 🔄 **Retry Logic** (exponential backoff for transient errors)
+- 🏥 **Health-Check Endpoint** (monitoring integration)
 
 ## 🚨 Critical: Germany-Specific Setup
 
@@ -131,6 +134,36 @@ TELEGRAM_CHAT_ID=12345678
 TELEGRAM_PREFIX="[SMS Gateway]"
 RATE_LIMIT_SECONDS=300
 ```
+
+### Advanced Configuration
+
+#### Debug Logging
+```env
+LOG_LEVEL=DEBUG  # Shows detailed hash checks, ID comparisons
+```
+
+#### SMS Encryption (Optional)
+
+**Requires:** `pip install cryptography>=42.0.0`
+
+```env
+SMS_ENCRYPTION_ENABLED=true
+SMS_ENCRYPTION_KEY_FILE=/etc/netgear-sms-gateway/.encryption.key
+```
+
+Generate key: `./src/netgear_sms_poller.py generate-key`
+
+See [docs/ENCRYPTION.md](docs/ENCRYPTION.md) for full guide.
+
+**Note:** Gateway works without encryption - install only if you need this feature.
+
+#### Health Check
+```bash
+./src/netgear_sms_poller.py health
+# Returns: 0 (healthy), 1 (degraded), 2 (down)
+```
+
+See [docs/MONITORING.md](docs/MONITORING.md) for integration examples.
 
 ## 🛡️ Security
 
