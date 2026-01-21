@@ -6,9 +6,12 @@
 # Netgear LM1200 SMS Poller - Telegram Forwarding Wrapper
 # Delegates SMS polling to Python, handles Telegram alerts
 #
-# Version: 1.0.3 - Bug-Fix Release
+# Version: 1.1.1 - Bug-Fix Release (Codex Audit)
 #
 # Changelog:
+#  - v1.1.1 (21.01.2026): Bug-fixes from Codex audit
+#    - Fixed config loading: Added readable check (-r) before sourcing
+#    - Improved error messages for config permission issues
 #  - v1.0.3 (17.01.2026): Bug-fixes from Codex audit
 #    - Fixed venv path (src/venv → ../venv) for symlink compatibility
 #    - Added jq as mandatory prerequisite
@@ -42,7 +45,7 @@ if ! SCRIPT_NAME="$(basename "$0" .sh)"; then
 fi
 readonly SCRIPT_NAME
 
-readonly SCRIPT_VERSION="1.0.3"
+readonly SCRIPT_VERSION="1.1.1"
 
 # Python script in same directory (uses venv in repo root)
 readonly PYTHON_SCRIPT="${SCRIPT_DIR}/netgear_sms_poller.py"
@@ -113,12 +116,21 @@ send_telegram_alert() {
 # Configuration Loading
 # ============================================================================
 
-# Load credentials from config file (if exists)
+# Load credentials from config file (if exists and readable)
 CONFIG_FILE="${CONFIG_FILE:-/etc/netgear-sms-gateway/config.env}"
 if [[ -f "$CONFIG_FILE" ]]; then
-    # shellcheck source=/dev/null
-    source "$CONFIG_FILE"
-    log_info "Loaded configuration from ${CONFIG_FILE}"
+    if [[ -r "$CONFIG_FILE" ]]; then
+        # shellcheck source=/dev/null
+        if source "$CONFIG_FILE"; then
+            log_info "Loaded configuration from ${CONFIG_FILE}"
+        else
+            log_error "Failed to parse config file: ${CONFIG_FILE}"
+            exit 1
+        fi
+    else
+        log_error "Config file not readable: ${CONFIG_FILE} (check permissions)"
+        exit 1
+    fi
 else
     log_warning "Config file not found: ${CONFIG_FILE}"
 fi

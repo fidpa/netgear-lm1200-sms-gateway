@@ -17,21 +17,21 @@
 
 - **First-time setup**: [SETUP.md § Installation & Deployment](SETUP.md#-installation--deployment)
 - **Critical modem config**: [SETUP.md § Modem Configuration](SETUP.md#-critical-modem-configuration-do-this-first)
-- **systemd service setup**: [SETUP.md § systemd Setup](SETUP.md#systemd-setup)
-- **Telegram integration**: [SETUP.md § Telegram](SETUP.md#telegram-integration-optional)
+- **systemd service setup**: [SETUP.md § Install systemd Units](SETUP.md#6-install-systemd-units)
+- **Configuration (incl. Telegram)**: [SETUP.md § Configuration](SETUP.md#4-create-configuration)
 
 ### Troubleshooting
 
 - **No SMS received**: [TROUBLESHOOTING.md § No SMS](TROUBLESHOOTING.md#1-no-sms-received-msgcount--0--critical)
-- **Service errors**: [TROUBLESHOOTING.md § Service Crashes](TROUBLESHOOTING.md#2-service-crashes-exit-code--0)
-- **Telegram issues**: [TROUBLESHOOTING.md § Telegram Not Working](TROUBLESHOOTING.md#3-telegram-forwarding-not-working)
-- **Modem unreachable**: [TROUBLESHOOTING.md § Connection Issues](TROUBLESHOOTING.md#4-connection-refused-or-timeout)
+- **Authentication errors**: [TROUBLESHOOTING.md § Auth Failed](TROUBLESHOOTING.md#3-authentication-failed-exit-code-1)
+- **Telegram issues**: [TROUBLESHOOTING.md § Telegram Not Received](TROUBLESHOOTING.md#4-telegram-alerts-not-received)
+- **SMS not forwarded**: [TROUBLESHOOTING.md § Exit Code 0](TROUBLESHOOTING.md#5-sms-not-forwarded-exit-code-0)
 
 ### API & Development
 
-- **SMS endpoints**: [API_REFERENCE.md § SMS Operations](API_REFERENCE.md#sms-operations)
-- **Response formats**: [API_REFERENCE.md § Response Types](API_REFERENCE.md#response-types)
-- **Rate limits**: [API_REFERENCE.md § Rate Limiting](API_REFERENCE.md#rate-limiting)
+- **SMS data structure**: [API_REFERENCE.md § GET /api/model.json](API_REFERENCE.md#1-get-apimodeljson)
+- **Authentication flow**: [API_REFERENCE.md § Auth Flow](API_REFERENCE.md#-authentication-flow)
+- **Rate limits**: [API_REFERENCE.md § Rate Limiting](API_REFERENCE.md#-rate-limiting)
 
 ## 📝 Documentation Standards
 

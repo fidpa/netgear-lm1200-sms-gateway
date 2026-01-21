@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automated syntax validation
 - Automated GitHub Releases via tags
 
+## [1.1.1] - 2026-01-21
+
+### Fixed
+- Config file permissions: Changed from `root:root 0600` to `$USER:$USER 0600` so service user can read credentials
+- Signal handling: `shutdown_requested` flag is now checked at safe checkpoints (before polling, after HTTP requests)
+- jq dependency: Changed from optional WARNING to mandatory ERROR in install.sh (required for SMS forwarding)
+- Config loading: Added readable check (`-r`) before sourcing config file, with proper error messages
+
+### Changed
+- `signal_handler()` now logs signal name (SIGTERM/SIGINT) for better debugging
+- `poll_sms()` returns exit code 130 on graceful shutdown via signal
+- Feature description updated: "Graceful shutdown on SIGTERM/SIGINT (exits at safe checkpoints)"
+
 ## [1.1.0] - 2026-01-21
 
 ### Added
@@ -77,7 +90,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Troubleshooting guide
 - Setup documentation
 
-[Unreleased]: https://github.com/fidpa/netgear-lm1200-sms-gateway/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/fidpa/netgear-lm1200-sms-gateway/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/fidpa/netgear-lm1200-sms-gateway/releases/tag/v1.1.1
 [1.1.0]: https://github.com/fidpa/netgear-lm1200-sms-gateway/releases/tag/v1.1.0
 [1.0.4]: https://github.com/fidpa/netgear-lm1200-sms-gateway/releases/tag/v1.0.4
 [1.0.3]: https://github.com/fidpa/netgear-lm1200-sms-gateway/releases/tag/v1.0.3

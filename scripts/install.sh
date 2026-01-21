@@ -25,7 +25,9 @@ if ! command -v systemctl >/dev/null 2>&1; then
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
-    echo "WARNING: jq not found. Install jq for easier SMS debugging."
+    echo "ERROR: jq not found. Required for SMS state parsing and Telegram forwarding."
+    echo "       Install with: sudo apt install jq"
+    exit 1
 fi
 
 echo "✓ Prerequisites OK"
@@ -66,7 +68,8 @@ sudo mkdir -p /etc/netgear-sms-gateway
 
 if [[ ! -f /etc/netgear-sms-gateway/config.env ]]; then
     sudo cp "${REPO_DIR}/config/config.example.env" /etc/netgear-sms-gateway/config.env
-    sudo chown root:root /etc/netgear-sms-gateway/config.env
+    # Service runs as $USER, so config must be readable by that user
+    sudo chown "$USER:$USER" /etc/netgear-sms-gateway/config.env
     sudo chmod 600 /etc/netgear-sms-gateway/config.env
     echo "✓ Config file created: /etc/netgear-sms-gateway/config.env"
     echo "⚠️  IMPORTANT: Edit config file with your credentials!"

@@ -7,7 +7,7 @@ Netgear LM1200 SMS Poller (Authenticated API Version)
 Polls LM1200 modem for incoming SMS messages and forwards them via Telegram.
 Stores SMS locally in monthly-rotated JSON files for backup/history.
 
-Version: 1.1.0 - Hash-based Deduplication & ID Reset Handling
+Version: 1.1.1 - Bug-Fix Release (Codex Audit)
 
 Use Case: Automatically forward 2FA/OTP codes via Telegram
 
@@ -19,7 +19,7 @@ Features:
  - State management (last_processed_sms_id tracking)
  - Monthly-rotated JSON storage (hash-deduplicated)
  - Telegram forwarding via Bash wrapper (exit code 2 signals new SMS)
- - Signal handling (SIGTERM/SIGINT)
+ - Graceful shutdown on SIGTERM/SIGINT (exits at safe checkpoints)
  - Python 3.10+ type hints
 
 Returns (check mode):
@@ -115,6 +115,7 @@ def compute_sms_hash_dict(msg: dict) -> str:
     Berechnet eindeutigen Hash für SMS-Dict zur Deduplizierung im JSON-Archiv.
 
     Gleiche Logik wie compute_sms_hash(), aber für dict statt SMSMessage.
+    Uses defensive .get() to handle legacy/corrupt entries gracefully.
 
     Args:
         msg: SMS als dict mit keys 'number', 'time', 'content'
@@ -122,16 +123,22 @@ def compute_sms_hash_dict(msg: dict) -> str:
     Returns:
         SHA256 Hash (erste 16 Zeichen für Kompaktheit)
     """
-    hash_input = f"{msg['number']}|{msg['time']}|{msg['content']}"
+    # Defensive: use .get() to handle legacy/corrupt entries without KeyError
+    number = msg.get('number', '')
+    time_str = msg.get('time', '')
+    content = msg.get('content', '')
+    hash_input = f"{number}|{time_str}|{content}"
     return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()[:16]
 
 def is_new_sms(sms: SMSMessage, state: 'SMSPollerState') -> bool:
     """
     Prüft ob SMS neu ist (nicht bereits verarbeitet).
 
-    Multi-Layer Check:
-    1. Hash-basiert (Primary): Hash nicht in processed_hashes
-    2. ID-basiert (Secondary): ID > last_processed_sms_id ODER Reset erkannt
+    Uses hash-based deduplication only (most robust method).
+    ID-based tracking is intentionally NOT used as fallback because:
+    - Modem IDs can reset (after reboot, power loss, etc.)
+    - Hash-based detection is content-aware and never produces false negatives
+    - ID reset is only logged for informational purposes
 
     Args:
         sms: SMS zu prüfen
@@ -186,7 +193,8 @@ class SMSPollerState:
         # Add hash to processed set (with size limit)
         if sms_hash not in self.processed_hashes:
             self.processed_hashes.append(sms_hash)
-            # Limit to last 1000 hashes (prevent unbounded growth)
+            # Prevent unbounded growth: when exceeding 1000, truncate to 500 most recent
+            # This provides ~500 buffer before next truncation (hysteresis pattern)
             if len(self.processed_hashes) > 1000:
                 self.processed_hashes = self.processed_hashes[-500:]
 
@@ -206,9 +214,15 @@ class SMSPollerState:
         self.last_check = time.time()
 
 def signal_handler(signum, frame):
-    """Handle SIGTERM/SIGINT gracefully."""
+    """
+    Handle SIGTERM/SIGINT gracefully.
+
+    For oneshot mode (check), sets flag and lets current operation complete.
+    Poll function checks this flag and exits early if set.
+    """
     global shutdown_requested
-    logger.warning("Shutdown signal received")
+    sig_name = signal.Signals(signum).name
+    logger.warning(f"Shutdown signal received ({sig_name})")
     shutdown_requested = True
 
 # Register signal handlers
@@ -458,16 +472,23 @@ async def poll_sms() -> int:
             0: No new SMS
             1: Error (authentication failed, API error)
             2: New SMS forwarded (triggers Telegram alert in wrapper)
+            130: Interrupted by signal (SIGTERM/SIGINT)
 
     Flow:
-        1. Login to modem (authenticated session)
-        2. Fetch SMS list from API
-        3. Load current state (last_processed_sms_id)
-        4. Filter NEW SMS (id > last_processed_sms_id)
-        5. Save new SMS to monthly JSON file
-        6. Update state with latest SMS
-        7. Return exit code (2 if new SMS, 0 if none)
+        1. Check for shutdown signal (early exit)
+        2. Login to modem (authenticated session)
+        3. Fetch SMS list from API
+        4. Load current state (last_processed_sms_id)
+        5. Filter NEW SMS (id > last_processed_sms_id)
+        6. Save new SMS to monthly JSON file
+        7. Update state with latest SMS
+        8. Return exit code (2 if new SMS, 0 if none)
     """
+    # Check for shutdown signal before starting
+    if shutdown_requested:
+        logger.info("Shutdown requested before polling, exiting")
+        return 130
+
     # Load current state
     state = load_state()
 
@@ -487,6 +508,11 @@ async def poll_sms() -> int:
 
             # Fetch SMS list
             sms_list = await fetch_sms_list(session)
+
+            # Check for shutdown signal after HTTP requests
+            if shutdown_requested:
+                logger.info("Shutdown requested after fetch, exiting")
+                return 130
 
             if not sms_list:
                 # No SMS in inbox

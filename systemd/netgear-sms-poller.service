@@ -8,7 +8,7 @@ StartLimitBurst=3
 
 [Service]
 Type=oneshot
-SuccessExitStatus=0 1 2 130
+SuccessExitStatus=0 2 130
 User=YOUR_USERNAME
 Group=YOUR_USERNAME
 

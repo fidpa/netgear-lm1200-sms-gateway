@@ -1,7 +1,7 @@
 # Netgear LM1200 SMS API Reference
 
-**Version**: 1.0.0
-**Date**: 2025-12-30
+**Version**: 1.1.0
+**Date**: 2026-01-21
 
 ## ⚡ TL;DR (20 words)
 
@@ -134,9 +134,13 @@ ok_redirect=/success.json
 ### 3-Step Login Process
 
 ```python
+import json
+
 # Step 1: Get security token (unauthenticated)
+# Note: API returns JSON with Content-Type: text/plain, so use text() + json.loads()
 async with session.get('http://192.168.0.201/api/model.json') as response:
-    data = await response.json()
+    text = await response.text()
+    data = json.loads(text)
     token = data['session']['secToken']
 
 # Step 2: Login (creates session cookie)
@@ -151,7 +155,8 @@ async with session.post('http://192.168.0.201/Forms/config', data=login_data) as
 # Step 3: Access authenticated endpoints
 async with session.get('http://192.168.0.201/api/model.json') as response:
     # Now returns full data (WWAN, signal, etc.)
-    data = await response.json()
+    text = await response.text()
+    data = json.loads(text)
 ```
 
 ### Session Management
@@ -205,21 +210,24 @@ class SMSMessage:
 
 **Location**: `/var/lib/netgear-sms-gateway/sms-poller-state.json`
 
-**Schema**:
+**Schema** (v1.1.0):
 ```python
 @dataclass
 class SMSPollerState:
     last_processed_sms_id: int      # ID of last processed SMS
+    max_sms_id_seen: int            # Highest ID ever seen (detects resets)
     last_check: float               # Unix timestamp of last check
     total_sms_received: int         # Total count of SMS received
     last_sms_timestamp: float       # Unix timestamp of last SMS
     latest_sms: dict[str, str]      # Latest SMS for Telegram forwarding
+    processed_hashes: list[str]     # SHA256 hashes for deduplication
 ```
 
-**Example**:
+**Example** (v1.1.0):
 ```json
 {
   "last_processed_sms_id": 5,
+  "max_sms_id_seen": 5,
   "last_check": 1735513200.0,
   "total_sms_received": 3,
   "last_sms_timestamp": 1735513100.0,
@@ -227,9 +235,14 @@ class SMSPollerState:
     "number": "+491234567890",
     "time": "2025-12-29 23:00:00",
     "content": "Your OTP code is 123456"
-  }
+  },
+  "processed_hashes": ["a1b2c3d4e5f6g7h8", "i9j0k1l2m3n4o5p6"]
 }
 ```
+
+**New fields (v1.1.0)**:
+- `max_sms_id_seen`: Detects ID resets after modem reboot
+- `processed_hashes`: SHA256[:16] hashes for robust deduplication (max 1000, truncates to 500)
 
 **Atomic Writes**: Via pathlib (temp file + rename)
 
@@ -515,6 +528,6 @@ Persistent=true         # Catch up missed runs after reboot
 
 ---
 
-**Version**: 1.0.0
-**Last Updated**: 2025-12-30
-**Status**: ✅ Complete
+**Version**: 1.1.0
+**Last Updated**: 2026-01-21
+**Status**: ✅ Complete (v1.1.0: Hash-based deduplication, corrected code examples, defensive coding)
