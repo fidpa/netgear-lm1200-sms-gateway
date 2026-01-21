@@ -7,14 +7,17 @@ Netgear LM1200 SMS Poller (Authenticated API Version)
 Polls LM1200 modem for incoming SMS messages and forwards them via Telegram.
 Stores SMS locally in monthly-rotated JSON files for backup/history.
 
-Version: 1.0.2 - Initial Release
+Version: 1.1.0 - Hash-based Deduplication & ID Reset Handling
 
 Use Case: Automatically forward 2FA/OTP codes via Telegram
 
 Features:
+ - Hash-based SMS deduplication (robust against ID resets)
+ - ID reset detection (max_sms_id_seen tracking)
+ - Automatic state migration (v1.0 → v1.1)
  - Authenticated API access (aiohttp + CookieJar)
  - State management (last_processed_sms_id tracking)
- - Monthly-rotated JSON storage (/var/lib/netgear-sms-gateway/sms-inbox-YYYY-MM.json)
+ - Monthly-rotated JSON storage (hash-deduplicated)
  - Telegram forwarding via Bash wrapper (exit code 2 signals new SMS)
  - Signal handling (SIGTERM/SIGINT)
  - Python 3.10+ type hints
@@ -37,6 +40,7 @@ Created: 2025-12-30
 
 import argparse
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -89,6 +93,66 @@ class SMSMessage:
     content: str
     read: bool
 
+def compute_sms_hash(sms: SMSMessage) -> str:
+    """
+    Berechnet eindeutigen Hash für SMS zur Deduplizierung.
+
+    Hash basiert auf: number + time + content
+    (ID wird bewusst ausgelassen, da sie resetten kann)
+
+    Args:
+        sms: SMSMessage Objekt
+
+    Returns:
+        SHA256 Hash (erste 16 Zeichen für Kompaktheit)
+    """
+    hash_input = f"{sms.number}|{sms.time}|{sms.content}"
+    return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()[:16]
+
+
+def compute_sms_hash_dict(msg: dict) -> str:
+    """
+    Berechnet eindeutigen Hash für SMS-Dict zur Deduplizierung im JSON-Archiv.
+
+    Gleiche Logik wie compute_sms_hash(), aber für dict statt SMSMessage.
+
+    Args:
+        msg: SMS als dict mit keys 'number', 'time', 'content'
+
+    Returns:
+        SHA256 Hash (erste 16 Zeichen für Kompaktheit)
+    """
+    hash_input = f"{msg['number']}|{msg['time']}|{msg['content']}"
+    return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()[:16]
+
+def is_new_sms(sms: SMSMessage, state: 'SMSPollerState') -> bool:
+    """
+    Prüft ob SMS neu ist (nicht bereits verarbeitet).
+
+    Multi-Layer Check:
+    1. Hash-basiert (Primary): Hash nicht in processed_hashes
+    2. ID-basiert (Secondary): ID > last_processed_sms_id ODER Reset erkannt
+
+    Args:
+        sms: SMS zu prüfen
+        state: Aktueller State
+
+    Returns:
+        True wenn SMS neu ist, False wenn bereits verarbeitet
+    """
+    sms_hash = compute_sms_hash(sms)
+
+    # Primary: Hash-Check (zuverlässigste Methode)
+    if sms_hash in state.processed_hashes:
+        logger.debug(f"SMS #{sms.id} already processed (hash match)")
+        return False
+
+    # ID-Reset Detection: Wenn aktuelle max ID < historische max ID
+    if state.max_sms_id_seen > 0 and sms.id < state.max_sms_id_seen:
+        logger.info(f"ID reset detected: current={sms.id}, max_seen={state.max_sms_id_seen}")
+
+    return True
+
 @dataclass
 class SMSPollerState:
     """
@@ -96,20 +160,37 @@ class SMSPollerState:
 
     Attributes:
         last_processed_sms_id: ID of last processed SMS (track new messages)
+        max_sms_id_seen: Highest SMS ID ever seen (detects ID reset)
         last_check: Unix timestamp of last check
         total_sms_received: Total count of SMS received
         last_sms_timestamp: Unix timestamp of last SMS received
         latest_sms: Latest SMS for Telegram forwarding (dict format)
+        processed_hashes: List of content hashes for deduplication
     """
     last_processed_sms_id: int = 0
+    max_sms_id_seen: int = 0
     last_check: float = 0.0
     total_sms_received: int = 0
     last_sms_timestamp: float = 0.0
     latest_sms: dict[str, str] = field(default_factory=dict)
+    processed_hashes: list[str] = field(default_factory=list)
 
     def update_with_new_sms(self, sms: SMSMessage) -> None:
         """Update state with newly received SMS."""
+        sms_hash = compute_sms_hash(sms)
+
+        # Update ID tracking
         self.last_processed_sms_id = max(self.last_processed_sms_id, sms.id)
+        self.max_sms_id_seen = max(self.max_sms_id_seen, sms.id)
+
+        # Add hash to processed set (with size limit)
+        if sms_hash not in self.processed_hashes:
+            self.processed_hashes.append(sms_hash)
+            # Limit to last 1000 hashes (prevent unbounded growth)
+            if len(self.processed_hashes) > 1000:
+                self.processed_hashes = self.processed_hashes[-500:]
+
+        # Update timestamps and counters
         self.last_check = time.time()
         self.total_sms_received += 1
         self.last_sms_timestamp = time.time()
@@ -278,18 +359,22 @@ def save_sms_to_json(sms_list: list[SMSMessage]) -> bool:
         # Convert SMSMessage to dict
         new_sms = [asdict(sms) for sms in sms_list]
 
-        # Merge (avoid duplicates by ID)
-        existing_ids = {msg['id'] for msg in existing_sms}
+        # Merge (avoid duplicates by content hash - robust against ID reset)
+        existing_hashes = {compute_sms_hash_dict(msg) for msg in existing_sms}
+        added_count = 0
         for sms in new_sms:
-            if sms['id'] not in existing_ids:
+            sms_hash = compute_sms_hash_dict(sms)
+            if sms_hash not in existing_hashes:
                 existing_sms.append(sms)
+                existing_hashes.add(sms_hash)  # Prevent duplicates within batch
+                added_count += 1
 
         # Atomic write (temp file + rename)
         temp_file = sms_file.with_suffix('.tmp')
         temp_file.write_text(json.dumps(existing_sms, indent=2, ensure_ascii=False))
         temp_file.replace(sms_file)
 
-        logger.info(f"Saved {len(new_sms)} new SMS to {sms_file}")
+        logger.info(f"Archived {added_count}/{len(new_sms)} SMS to {sms_file} (hash-deduplicated)")
         return True
 
     except OSError as e:
@@ -316,6 +401,17 @@ def load_state() -> SMSPollerState:
 
     try:
         data = json.loads(STATE_FILE.read_text())
+
+        # Migration: Add new fields if missing (v1.0 -> v1.1)
+        if 'processed_hashes' not in data:
+            data['processed_hashes'] = []
+            logger.info("Migrated state: added processed_hashes field")
+
+        if 'max_sms_id_seen' not in data:
+            # Initialize with current last_processed_sms_id
+            data['max_sms_id_seen'] = data.get('last_processed_sms_id', 0)
+            logger.info("Migrated state: added max_sms_id_seen field")
+
         # Convert dict to dataclass (handles missing fields gracefully)
         state = SMSPollerState(**{k: v for k, v in data.items() if k in SMSPollerState.__dataclass_fields__})
         logger.debug(f"Loaded state: last_processed_sms_id={state.last_processed_sms_id}, total={state.total_sms_received}")
@@ -375,7 +471,9 @@ async def poll_sms() -> int:
     # Load current state
     state = load_state()
 
-    logger.info(f"Last processed SMS ID: {state.last_processed_sms_id}")
+    logger.info(f"Last processed SMS ID: {state.last_processed_sms_id}, "
+                f"Max ID seen: {state.max_sms_id_seen}, "
+                f"Hashes tracked: {len(state.processed_hashes)}")
 
     # Use CookieJar for session management (needed for authentication)
     jar = aiohttp.CookieJar(unsafe=True)
@@ -393,17 +491,21 @@ async def poll_sms() -> int:
             if not sms_list:
                 # No SMS in inbox
                 state.mark_check()
-                save_state(state)
+                if not save_state(state):
+                    logger.error("Critical: Failed to save state")
+                    return 1
                 logger.info("No SMS in modem inbox")
                 return 0
 
-            # Filter NEW SMS (id > last_processed_sms_id)
-            new_sms = [sms for sms in sms_list if sms.id > state.last_processed_sms_id]
+            # Filter NEW SMS (hash-based deduplication)
+            new_sms = [sms for sms in sms_list if is_new_sms(sms, state)]
 
             if not new_sms:
                 # No new SMS since last check
                 state.mark_check()
-                save_state(state)
+                if not save_state(state):
+                    logger.error("Critical: Failed to save state")
+                    return 1
                 logger.info(f"No new SMS (all {len(sms_list)} already processed)")
                 return 0
 
@@ -411,7 +513,8 @@ async def poll_sms() -> int:
             logger.info(f"Found {len(new_sms)} new SMS")
 
             # Save to monthly JSON file
-            save_sms_to_json(new_sms)
+            if not save_sms_to_json(new_sms):
+                logger.warning("Failed to save SMS to JSON archive (non-critical)")
 
             # Update state with latest SMS (for Telegram forwarding)
             # Process in order, update state with the LAST one
@@ -420,7 +523,9 @@ async def poll_sms() -> int:
                 state.update_with_new_sms(sms)
 
             # Save updated state
-            save_state(state)
+            if not save_state(state):
+                logger.error("Critical: Failed to save state after processing SMS")
+                return 1
 
             logger.info(f"Processed {len(new_sms)} new SMS, last_id={state.last_processed_sms_id}")
 

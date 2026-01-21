@@ -8,6 +8,7 @@
 |----------|-------------|----------|
 | [SETUP.md](SETUP.md) | Complete installation & configuration guide | New users, sysadmins |
 | [API_REFERENCE.md](API_REFERENCE.md) | Netgear LM1200 API documentation | Developers, integrators |
+| [UPGRADE_GUIDE.md](UPGRADE_GUIDE.md) | Migrating from v1.0.x to v1.1.0 | Existing users |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common issues & solutions | All users |
 
 ## 🚀 Quick Links
@@ -61,5 +62,5 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for full guidelines.
 
 ---
 
-**Last Updated**: 2026-01-20
+**Last Updated**: 2026-01-21
 **Maintainer**: fidpa

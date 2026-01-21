@@ -14,6 +14,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automated syntax validation
 - Automated GitHub Releases via tags
 
+## [1.1.0] - 2026-01-21
+
+### Added
+- Hash-based SMS deduplication (prevents duplicates on ID reset)
+- `max_sms_id_seen` tracking for ID reset detection
+- Automatic state migration (v1.0.x → v1.1.0)
+- `compute_sms_hash()` and `compute_sms_hash_dict()` utility functions
+- `is_new_sms()` multi-layer check (hash + ID + reset detection)
+
+### Changed
+- `SMSPollerState` now tracks `processed_hashes` (list) and `max_sms_id_seen` (int)
+- `save_sms_to_json()` uses hash-based merging instead of ID-based
+- `poll_sms()` returns exit code 1 on critical state save failures
+- Improved error handling with explicit exit codes
+
+### Fixed
+- Duplicate SMS after modem ID reset (hash-based detection prevents this)
+- Silent state save failures (now logged and return exit code 1)
+
+### Migration
+- Existing v1.0.x state files automatically migrate on first run
+- No manual intervention required (backward compatible)
+
 ## [1.0.4] - 2026-01-20
 
 ### Added
@@ -54,7 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Troubleshooting guide
 - Setup documentation
 
-[Unreleased]: https://github.com/fidpa/netgear-lm1200-sms-gateway/compare/v1.0.4...HEAD
+[Unreleased]: https://github.com/fidpa/netgear-lm1200-sms-gateway/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/fidpa/netgear-lm1200-sms-gateway/releases/tag/v1.1.0
 [1.0.4]: https://github.com/fidpa/netgear-lm1200-sms-gateway/releases/tag/v1.0.4
 [1.0.3]: https://github.com/fidpa/netgear-lm1200-sms-gateway/releases/tag/v1.0.3
 [1.0.2]: https://github.com/fidpa/netgear-lm1200-sms-gateway/releases/tag/v1.0.2
