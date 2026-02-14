@@ -14,6 +14,11 @@ Group=YOUR_USERNAME
 
 # Environment
 EnvironmentFile=/etc/netgear-sms-gateway/config.env
+# Extended retry for modem reboots (~3 min coverage)
+Environment="SMS_RETRY_MAX_ATTEMPTS=5"
+Environment="SMS_RETRY_INITIAL_DELAY=10"
+# Consecutive failure threshold before Telegram alert
+Environment="SMS_FAILURE_THRESHOLD=3"
 
 # Execute SMS poller via symlink
 ExecStart=/usr/local/bin/netgear-sms-poller
@@ -31,7 +36,7 @@ ProtectHome=read-only
 ReadWritePaths=/var/lib/netgear-sms-gateway
 
 # Timeout
-TimeoutStartSec=120s
+TimeoutStartSec=240s
 
 [Install]
 WantedBy=multi-user.target

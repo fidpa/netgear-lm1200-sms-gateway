@@ -6,9 +6,15 @@
 # Netgear LM1200 SMS Poller - Telegram Forwarding Wrapper
 # Delegates SMS polling to Python, handles Telegram alerts
 #
-# Version: 1.1.1 - Bug-Fix Release (Codex Audit)
+# Version: 1.2.0 - Transient Failure Alert Suppression
 #
 # Changelog:
+#  - v1.2.0 (14.02.2026): Transient failure alert suppression
+#    - Consecutive failure tracking via FAILURE_COUNT_FILE
+#    - Alert only after SMS_FAILURE_THRESHOLD consecutive failures (default: 3)
+#    - Recovery alert when service recovers after threshold breach
+#    - Extended Python retries via ENV vars (5 attempts, ~3 min coverage)
+#    - TimeoutStartSec raised to 240s for extended retries
 #  - v1.1.1 (21.01.2026): Bug-fixes from Codex audit
 #    - Fixed config loading: Added readable check (-r) before sourcing
 #    - Improved error messages for config permission issues
@@ -45,7 +51,7 @@ if ! SCRIPT_NAME="$(basename "$0" .sh)"; then
 fi
 readonly SCRIPT_NAME
 
-readonly SCRIPT_VERSION="1.1.1"
+readonly SCRIPT_VERSION="1.2.0"
 
 # Python script in same directory (uses venv in repo root)
 readonly PYTHON_SCRIPT="${SCRIPT_DIR}/netgear_sms_poller.py"
@@ -54,6 +60,10 @@ readonly PYTHON_VENV="${SCRIPT_DIR}/../venv/bin/python"
 # State directory (configurable via environment)
 readonly STATE_DIR="${SMS_STATE_DIR:-/var/lib/netgear-sms-gateway}"
 readonly STATE_FILE="${STATE_DIR}/sms-poller-state.json"
+
+# Consecutive failure tracking
+readonly FAILURE_COUNT_FILE="${STATE_DIR}/failure_count"
+readonly FAILURE_THRESHOLD="${SMS_FAILURE_THRESHOLD:-3}"
 
 # ============================================================================
 # Inline Logging Functions (replaces logging.sh dependency)
@@ -160,6 +170,48 @@ cleanup() {
 trap cleanup SIGTERM SIGINT
 
 # ============================================================================
+# Consecutive Failure Tracking
+# ============================================================================
+
+get_failure_count() {
+    if [[ -f "$FAILURE_COUNT_FILE" ]]; then
+        local count
+        count=$(cat "$FAILURE_COUNT_FILE" 2>/dev/null) || count="0"
+        # Validate: must be integer
+        if [[ "$count" =~ ^[0-9]+$ ]]; then
+            echo "$count"
+        else
+            echo "0"
+        fi
+    else
+        echo "0"
+    fi
+}
+
+increment_failure_count() {
+    local current_count new_count
+    current_count=$(get_failure_count)
+    new_count=$((current_count + 1))
+    echo "$new_count" > "$FAILURE_COUNT_FILE" 2>/dev/null || \
+        log_warning "Failed to write failure count file"
+    echo "$new_count"
+}
+
+reset_failure_count() {
+    local previous_count
+    previous_count=$(get_failure_count)
+    rm -f "$FAILURE_COUNT_FILE"
+
+    if [[ "$previous_count" -ge "$FAILURE_THRESHOLD" ]]; then
+        log_info "SMS Poller recovered after ${previous_count} consecutive failures"
+        send_telegram_alert "sms_poller_recovered" \
+            "✅ SMS Poller recovered after ${previous_count} consecutive failures"
+    elif [[ "$previous_count" -gt 0 ]]; then
+        log_info "Recovered after ${previous_count} failure(s) (below threshold)"
+    fi
+}
+
+# ============================================================================
 # Prerequisite Checks
 # ============================================================================
 
@@ -212,19 +264,29 @@ main() {
     case $sms_exit in
         0)
             # No new SMS
+            reset_failure_count
             log_info "No new SMS received"
             return 0
             ;;
 
         1)
             # Error (authentication failed, API error, etc.)
-            log_error "SMS poller failed"
-            send_telegram_alert "sms_poller_error" "❌ SMS Poller Error: API access failed"
+            local failure_count
+            failure_count=$(increment_failure_count)
+            log_error "SMS poller failed (${failure_count}/${FAILURE_THRESHOLD})"
+
+            if [[ "$failure_count" -ge "$FAILURE_THRESHOLD" ]]; then
+                send_telegram_alert "sms_poller_error" \
+                    "❌ SMS Poller Error: API access failed (${failure_count} consecutive failures)"
+            else
+                log_info "Below threshold (${failure_count}/${FAILURE_THRESHOLD}), no alert"
+            fi
             return 1
             ;;
 
         2)
             # New SMS received - forward via Telegram
+            reset_failure_count
             log_success "New SMS received, forwarding via Telegram"
 
             # Read latest SMS from state file
@@ -293,8 +355,16 @@ ${sms_content}"
 
         *)
             # Unexpected exit code
-            log_error "Unexpected exit code from Python: $sms_exit"
-            send_telegram_alert "sms_unexpected_error" "❌ SMS Poller: Unexpected error (Exit Code: $sms_exit)"
+            local failure_count
+            failure_count=$(increment_failure_count)
+            log_error "Unexpected exit code: $sms_exit (${failure_count}/${FAILURE_THRESHOLD})"
+
+            if [[ "$failure_count" -ge "$FAILURE_THRESHOLD" ]]; then
+                send_telegram_alert "sms_unexpected_error" \
+                    "❌ SMS Poller: Unexpected error (Exit ${sms_exit}, ${failure_count} consecutive failures)"
+            else
+                log_info "Below threshold (${failure_count}/${FAILURE_THRESHOLD}), no alert"
+            fi
             return 1
             ;;
     esac

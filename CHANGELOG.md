@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-02-14
+
+### Added
+- **Transient Failure Alert Suppression** - No more false alerts during modem reboots (#7)
+  - Consecutive failure tracking via persistent counter file
+  - Configurable threshold: `SMS_FAILURE_THRESHOLD` (default: 3 failures = ~15 min)
+  - Recovery alerts when service recovers after threshold breach
+  - Extended retry defaults: 5 attempts with 10s initial delay (~3 min coverage)
+  - systemd TimeoutStartSec raised from 120s to 240s
+
+### Changed
+- Default retry parameters: `SMS_RETRY_MAX_ATTEMPTS` 3→5, `SMS_RETRY_INITIAL_DELAY` 5→10
+- Bash wrapper version: 1.1.1 → 1.2.0
+
+### Migration Notes
+- No breaking changes, 100% backward compatible
+- Previous behavior (immediate alert on first failure) can be restored with `SMS_FAILURE_THRESHOLD=1`
+- New file created in state directory: `failure_count` (auto-managed, safe to delete)
+
 ## [1.2.1] - 2026-01-22
 
 ### Fixed
@@ -134,7 +153,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Troubleshooting guide
 - Setup documentation
 
-[Unreleased]: https://github.com/fidpa/netgear-lm1200-sms-gateway/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/fidpa/netgear-lm1200-sms-gateway/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/fidpa/netgear-lm1200-sms-gateway/releases/tag/v1.3.0
+[1.2.1]: https://github.com/fidpa/netgear-lm1200-sms-gateway/releases/tag/v1.2.1
 [1.1.1]: https://github.com/fidpa/netgear-lm1200-sms-gateway/releases/tag/v1.1.1
 [1.1.0]: https://github.com/fidpa/netgear-lm1200-sms-gateway/releases/tag/v1.1.0
 [1.0.4]: https://github.com/fidpa/netgear-lm1200-sms-gateway/releases/tag/v1.0.4
