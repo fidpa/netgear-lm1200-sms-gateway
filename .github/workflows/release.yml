@@ -15,10 +15,25 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # generate_release_notes builds the body from commit messages. This
+      # repository's history is bare "vX.Y.Z" lines, so that produced a 95-byte
+      # body (a single compare link) while CHANGELOG.md held the actual work.
+      # The changelog section is the release body instead.
+      - name: Extract changelog section
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { p=1; next }
+            /^## \[/ { if (p) exit }
+            p { print }
+          ' CHANGELOG.md > release-notes.md
+          test -s release-notes.md || { echo "::error::no changelog section for $VERSION"; exit 1; }
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          body_path: release-notes.md
+          draft: false

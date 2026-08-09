@@ -14,6 +14,9 @@ config.env
 *.env
 !config.example.env
 
+# Secrets (encryption key lives in /etc, never in the tree)
+*.key
+
 # State files
 *.json
 .last_alert_*
@@ -36,6 +39,10 @@ Thumbs.db
 LINKEDIN_POST.md
 REDDIT_POST.md
 image-netgear-mittel.png
+
+# Local agent tooling (never publish)
+.claude/
+CLAUDE.md
 
 # Nextcloud/Rclone symlinks
 *.rclonelink

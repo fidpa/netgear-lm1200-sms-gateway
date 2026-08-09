@@ -1,6 +1,5 @@
 # Netgear LM1200 SMS API Reference
 
-**Version**: 1.1.0
 **Date**: 2026-01-21
 
 ## ⚡ TL;DR (20 words)
@@ -528,6 +527,5 @@ Persistent=true         # Catch up missed runs after reboot
 
 ---
 
-**Version**: 1.1.0
 **Last Updated**: 2026-01-21
 **Status**: ✅ Complete (v1.1.0: Hash-based deduplication, corrected code examples, defensive coding)

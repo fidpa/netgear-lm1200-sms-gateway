@@ -32,7 +32,10 @@ jobs:
 
       - name: Install and run Ruff
         run: |
-          pip install ruff
+          # Pinned on purpose: an unpinned install once pulled a Ruff whose
+          # default rule set had grown, turning this job red on an unchanged
+          # tree. The rule set itself lives in ruff.toml.
+          pip install ruff==0.16.0
           ruff check .
 
   syntax-check:

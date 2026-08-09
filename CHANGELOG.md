@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-08-09
+
+### Fixed
+- **Version is now read from a single source** - the wrapper reported `1.2.0` while the released tag was `v1.3.0`
+  - `src/netgear_sms_wrapper.sh` carried `readonly SCRIPT_VERSION="1.2.0"`, one minor release behind the tag
+  - `scripts/install.sh` carried a separate `# Version: 1.0.2`, four releases behind
+  - New `VERSION` file in the repository root is the only place a version number lives
+  - The wrapper resolves it at runtime and falls back to `unknown` if the file is missing or empty, so a broken version file can never stop the service from starting
+- **Startup log line now states the running version** - `=== Netgear LM1200 SMS Poller Check (v1.3.1) ===`
+  - Previously the version constant was defined but read by nothing, which is why the drift went unnoticed across six releases
+  - `journalctl -u netgear-sms-poller.service` now answers "which build is running here?"
+- **Ruff rule set pinned** - CI installed Ruff unpinned and the tool's default rule set is not a stable contract
+  - Ruff 0.16 enables 415 rules by default; earlier versions enabled four groups
+  - Result: 17 findings on an unchanged tree, i.e. the next push would have turned CI red without a single code change
+  - New `ruff.toml` fixes the selection to `E4`, `E7`, `E9`, `F` - the contract every release up to v1.3.0 was verified against
+  - `lint.yml` pins `ruff==0.16.0` so the default cannot shift underneath the repository again
+
+### Changed
+- **Release notes are cut from CHANGELOG.md instead of generated from commits**
+  - `generate_release_notes: true` produced a 95-byte body for v1.3.0: one compare link, nothing else, because the commit history consists of bare `vX.Y.Z` lines
+  - `release.yml` now extracts the changelog section for the tag and fails the workflow if that section is empty, rather than publishing an empty release
+  - `softprops/action-gh-release` upgraded v1 → v2 (v1 runs on a deprecated Node runtime)
+- Removed the changelog block duplicated in the `netgear_sms_wrapper.sh` header - `CHANGELOG.md` is the single record
+- `.gitignore` now covers `*.key` and local agent tooling (`.claude/`, `CLAUDE.md`)
+
+### Migration Notes
+- No breaking changes, 100% backward compatible - no configuration variable, exit code, state file or systemd unit changed
+- **Deployments that copy `src/` without the repository root must now also ship `VERSION`**, otherwise the log line reads `v unknown`. The supported install path (`scripts/install.sh`, which symlinks into the checked-out repository) is unaffected
+- Anyone running `ruff` locally against this repository will see fewer findings than before; the stricter modern default is not the project's lint contract
+
 ## [1.3.0] - 2026-02-14
 
 ### Added

@@ -6,30 +6,12 @@
 # Netgear LM1200 SMS Poller - Telegram Forwarding Wrapper
 # Delegates SMS polling to Python, handles Telegram alerts
 #
-# Version: 1.2.0 - Transient Failure Alert Suppression
+# Version: see the VERSION file in the repository root (resolved at runtime).
+# Change history: see CHANGELOG.md - this header deliberately keeps no second
+# copy, because the one it used to keep drifted a full minor release behind.
 #
-# Changelog:
-#  - v1.2.0 (14.02.2026): Transient failure alert suppression
-#    - Consecutive failure tracking via FAILURE_COUNT_FILE
-#    - Alert only after SMS_FAILURE_THRESHOLD consecutive failures (default: 3)
-#    - Recovery alert when service recovers after threshold breach
-#    - Extended Python retries via ENV vars (5 attempts, ~3 min coverage)
-#    - TimeoutStartSec raised to 240s for extended retries
-#  - v1.1.1 (21.01.2026): Bug-fixes from Codex audit
-#    - Fixed config loading: Added readable check (-r) before sourcing
-#    - Improved error messages for config permission issues
-#  - v1.0.3 (17.01.2026): Bug-fixes from Codex audit
-#    - Fixed venv path (src/venv → ../venv) for symlink compatibility
-#    - Added jq as mandatory prerequisite
-#    - Marked symlink as REQUIRED in setup guide
-#    - Removed unimplemented LOG_LEVEL config
-#    - Improved Quick-Start with service user setup
-#  - v1.0.2 (30.12.2025): Source-Code Header standardization
-#  - v1.0.0 (30.12.2025): Public release
-#    - Python handles: SMS fetch, state management, JSON storage
-#    - Bash handles: Telegram forwarding (optional)
-#    - Exit-code-based communication (0=no_new_sms, 1=error, 2=new_sms)
-#    - Inlined alerts.sh and logging.sh (self-contained)
+# Exit-code-based communication with the Python poller:
+#   0 = no new SMS, 1 = error, 2 = new SMS
 #
 # Repository: https://github.com/fidpa/netgear-lm1200-sms-gateway
 # Created: 2025-12-30
@@ -51,7 +33,22 @@ if ! SCRIPT_NAME="$(basename "$0" .sh)"; then
 fi
 readonly SCRIPT_NAME
 
-readonly SCRIPT_VERSION="1.2.0"
+# Version: single source of truth is the VERSION file in the repository root.
+# Two candidate paths: repo layout (src/../VERSION) and a flattened install.
+# A missing or empty file yields "unknown" - a broken version file must never
+# stop the service from starting.
+_version_file=""
+for _c in "${SCRIPT_DIR}/../VERSION" "${SCRIPT_DIR}/VERSION"; do
+    [[ -r "$_c" ]] && { _version_file="$_c"; break; }
+done
+if [[ -n "$_version_file" ]]; then
+    SCRIPT_VERSION="$(tr -d '[:space:]' < "$_version_file")"
+else
+    SCRIPT_VERSION="unknown"
+fi
+[[ -n "$SCRIPT_VERSION" ]] || SCRIPT_VERSION="unknown"
+readonly SCRIPT_VERSION
+unset _version_file _c
 
 # Python script in same directory (uses venv in repo root)
 readonly PYTHON_SCRIPT="${SCRIPT_DIR}/netgear_sms_poller.py"
@@ -247,7 +244,7 @@ main() {
         return 1
     fi
 
-    log_info "=== Netgear LM1200 SMS Poller Check ==="
+    log_info "=== Netgear LM1200 SMS Poller Check (v${SCRIPT_VERSION}) ==="
 
     # Run Python SMS poller
     # Python returns: 0=no_new_sms, 1=error, 2=new_sms_forwarded

@@ -1,6 +1,5 @@
 # Troubleshooting Guide
 
-**Version**: 1.0.0
 **Date**: 2025-12-30
 
 ## Common Issues
@@ -429,6 +428,5 @@ If you encounter issues not covered here:
 
 ---
 
-**Version**: 1.0.0
 **Last Updated**: 2025-12-30
 **Status**: ✅ Complete

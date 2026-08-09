@@ -1,6 +1,5 @@
 # Netgear LM1200 SMS Gateway Setup Guide
 
-**Version**: 1.0.0
 **Date**: 2025-12-30
 **Status**: ✅ Production Ready
 
@@ -509,6 +508,5 @@ curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" 
 
 </details>
 
-**Version**: 1.0.0
 **Last Updated**: 2025-12-30
 **Status**: ✅ Production Ready

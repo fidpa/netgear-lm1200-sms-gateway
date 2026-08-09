@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # https://github.com/fidpa/netgear-lm1200-sms-gateway
 #
-# Version: 1.0.2
+# Version: see the VERSION file in the repository root.
 # Created: 2025-12-30
 
 set -euo pipefail
