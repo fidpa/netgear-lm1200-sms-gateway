@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-08-12
+
+### Fixed
+- **`src/netgear_sms_wrapper.sh` and `scripts/install.sh` are executable again** - both were tracked with mode `100644` (no execute bit)
+  - `docs/SETUP.md` and `docs/TROUBLESHOOTING.md` document running the wrapper directly as `./netgear_sms_wrapper.sh`; without the execute bit that fails with `Permission denied`
+  - `scripts/install.sh` symlinks `netgear_sms_wrapper.sh` to `/usr/local/bin/netgear-sms-poller`, so a systemd unit invoking the symlink directly (rather than via `bash`) was equally affected
+  - No content change - `git diff` between `v1.3.1` and this release is mode-only
+
 ## [1.3.1] - 2026-08-09
 
 ### Fixed
