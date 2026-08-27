@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Copyright (c) 2025 Marc Allgeier (fidpa)
 # SPDX-License-Identifier: MIT
 # https://github.com/fidpa/netgear-lm1200-sms-gateway

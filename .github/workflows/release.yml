@@ -21,19 +21,39 @@ jobs:
       # generate_release_notes builds the body from commit messages. This
       # repository's history is bare "vX.Y.Z" lines, so that produced a 95-byte
       # body (a single compare link) while CHANGELOG.md held the actual work.
-      # The changelog section is the release body instead.
+      # The changelog section is the release body instead, and the headline in
+      # the section heading is the release title.
       - name: Extract changelog section
+        id: changelog
         run: |
           VERSION="${GITHUB_REF#refs/tags/v}"
           awk -v ver="$VERSION" '
             $0 ~ "^## \\[" ver "\\]" { p=1; next }
             /^## \[/ { if (p) exit }
+            /^\[[^]]+\]: http/ { if (p) exit }
             p { print }
-          ' CHANGELOG.md > release-notes.md
+          ' CHANGELOG.md | sed -e '/./,$!d' > release-notes.md
           test -s release-notes.md || { echo "::error::no changelog section for $VERSION"; exit 1; }
+
+          # Heading form: "## [X.Y.Z] - YYYY-MM-DD: <headline>"
+          HEADLINE=$(awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" {
+              if (match($0, /- [0-9]{4}-[0-9]{2}-[0-9]{2}: /)) {
+                print substr($0, RSTART + RLENGTH)
+              }
+              exit
+            }
+          ' CHANGELOG.md)
+          if [ -n "$HEADLINE" ]; then
+            echo "title=v${VERSION}: ${HEADLINE}" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::no headline in the [$VERSION] heading, falling back to the bare tag name"
+            echo "title=v${VERSION}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: ${{ steps.changelog.outputs.title }}
           body_path: release-notes.md
           draft: false
