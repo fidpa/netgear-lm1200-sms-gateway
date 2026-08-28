@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.4] - 2026-08-28: GitHub identifies the project as MIT-licensed
+
+### Changed
+
+- **The repository page shows the MIT licence, and licence-filtered searches
+  find the project.** `LICENSE` carried the repository URL on its own line
+  under the copyright notice. GitHub reads a licence text with an extra line as
+  modified and reports `NOASSERTION`, which leaves the licence field on the
+  repository page empty. The line is gone; the MIT text and the copyright
+  notice are byte-for-byte unchanged, and the URL is still in `README.md`.
+
 ## [1.3.3] - 2026-08-27: The Python entry point runs, and release titles say what changed
 
 `v1.3.2` restored the execute bit on `src/netgear_sms_wrapper.sh` and
@@ -332,7 +343,8 @@ copyright header replaced it on line 1. Fixed in `1.3.3`.
 - Troubleshooting guide
 - Setup documentation
 
-[Unreleased]: https://github.com/fidpa/netgear-lm1200-sms-gateway/compare/v1.3.3...HEAD
+[Unreleased]: https://github.com/fidpa/netgear-lm1200-sms-gateway/compare/v1.3.4...HEAD
+[1.3.4]: https://github.com/fidpa/netgear-lm1200-sms-gateway/compare/v1.3.3...v1.3.4
 [1.3.3]: https://github.com/fidpa/netgear-lm1200-sms-gateway/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/fidpa/netgear-lm1200-sms-gateway/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/fidpa/netgear-lm1200-sms-gateway/compare/v1.3.0...v1.3.1
