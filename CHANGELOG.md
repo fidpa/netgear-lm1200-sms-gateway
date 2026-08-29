@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.5] - 2026-08-30: The documentation says what the code does
+
+A pass over the four public documents measured every claim against the source.
+`README.md` advertised `AES-256` for a Fernet feature that is AES-128-CBC plus
+HMAC-SHA256, called the `health` action an endpoint, and promised "no
+duplicates, no lost messages" while the wrapper forwards one SMS per polling
+cycle and the rate limit can drop even that one. `SECURITY.md` described the
+modem login as HTTP Basic Auth, which it has never been, and still called
+encrypted storage a future option three releases after it shipped. Nothing in
+the code changed; what changed is that the documents now match it.
+
+### Changed
+
+- **`README.md` rewritten against the code and the README quality standard.**
+  Every claim now has a source in the repository, and the limits stand next to
+  the features
+  - Corrected: the encryption feature was labelled `AES-256`. Fernet is
+    AES-128-CBC plus HMAC-SHA256, as `docs/ENCRYPTION.md` already stated
+  - Corrected: the health check was called an "endpoint". It is the `health`
+    action of `src/netgear_sms_poller.py`, with exit codes 0, 1 and 2
+  - Corrected: "no duplicates, no lost messages" claimed more than the code
+    delivers. The hash list is trimmed to 500 entries past 1000, Telegram
+    receives one SMS per polling cycle (`latest_sms` holds one record), and
+    `RATE_LIMIT_SECONDS` applies to the SMS forward itself
+  - Added: a CLI Reference quoting `--help` verbatim, a configuration table
+    covering all 17 keys of `config/config.example.env` including the retry,
+    failure-threshold and health-check ones that were missing, and the note
+    that the unit file overrides three of them via `Environment=`
+  - Added: `scripts/install.sh` as the guided path, the `chmod 600` and
+    `chmod 700` steps the manual path was missing, and a link to
+    `docs/UPGRADE_GUIDE.md`
+  - Added: known limitations, a "Not recommended for" list, and the honest
+    security boundaries (plain HTTP to the modem, state directory permissions
+    follow the umask, forwarded 2FA codes live on Telegram servers)
+  - Removed: the em dash in the tagline and the `->` arrows in the setup paths,
+    per rule 6 of the standard
+
+- **`SECURITY.md` brought back in line with the code.** The document described a
+  1.0.x-era gateway
+  - Corrected: the modem login was described as HTTP Basic Auth with a
+    base64-encoded password. The poller reads `secToken` from
+    `/api/model.json` and posts it with the password as form fields to
+    `/Forms/config`. Plain HTTP either way, now stated as what it is
+  - Corrected: "SMS content stored in plaintext JSON files, future: consider
+    encrypted storage" ignored the Fernet option shipped in 1.2.0, and the
+    "restricted permissions" of the state directory were never set by anything.
+    The directory is created without an explicit mode, and `scripts/install.sh`
+    sets only the owner
+  - Corrected: "monthly rotation prevents unlimited log growth". Nothing deletes
+    old archives; the rotation splits the data, it does not bound it
+  - Corrected: the supported-versions table listed 1.0.x at release 1.3.4, and
+    the hardening list omitted `ProtectHome=read-only`
+  - Corrected: the modem web UI default password was given as `password`, which
+    contradicts `config/config.example.env`. The advice no longer names a value
+  - Added: a security-changelog entry for the 1.2.0 encryption feature, and the
+    note that encryption stops at the Telegram message, which the wrapper
+    decrypts before sending
+
+- **`docs/ENCRYPTION.md` and the `1.2.0` changelog entry no longer advertise
+  `AES-256`.** Both now name Fernet, matching the algorithm line that
+  `docs/ENCRYPTION.md` already carried
+
 ## [1.3.4] - 2026-08-28: GitHub identifies the project as MIT-licensed
 
 ### Changed
@@ -184,8 +246,8 @@ Available from `v1.2.1`: the `v1.2.0` tag sits on the `v1.1.1` commit, and the c
 that contains this work carries no tag.
 
 ### Added
-- **SMS bodies can be stored encrypted** - AES-256 via the optional `cryptography`
-  package, off by default
+- **SMS bodies can be stored encrypted** - Fernet (AES-128-CBC plus HMAC-SHA256)
+  via the optional `cryptography` package, off by default
   - New CLI mode `generate-key` writes the key; `docs/ENCRYPTION.md` covers key handling
   - Plaintext and encrypted entries coexist in the same state file, so enabling
     encryption does not require a migration or lose existing messages

@@ -2,9 +2,14 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-|---------|--------------------|
-| 1.0.x   | :white_check_mark: |
+| Version   | Supported          |
+|-----------|--------------------|
+| 1.3.x     | :white_check_mark: |
+| <= 1.2.x  | :x:                |
+
+Fixes go into the current minor release line. Older versions are not patched;
+[docs/UPGRADE_GUIDE.md](docs/UPGRADE_GUIDE.md) covers the state-file migration
+from the 1.0.x line.
 
 ## Reporting a Vulnerability
 
@@ -33,7 +38,7 @@ Please report security issues via:
 
 - Store credentials in `/etc/netgear-sms-gateway/config.env` with `chmod 600`
 - Never commit `config.env` or credentials to version control
-- Use strong admin password for modem web UI (default: password)
+- Change the modem web UI password from the factory default before deploying
 
 ### Network Security
 
@@ -45,6 +50,7 @@ Please report security issues via:
 
 The service includes security hardening:
 - `ProtectSystem=strict` - Read-only filesystem except state directory
+- `ProtectHome=read-only` - Home directories readable, not writable
 - `PrivateTmp=yes` - Private /tmp namespace
 - `NoNewPrivileges=yes` - Prevent privilege escalation
 - `ReadWritePaths=/var/lib/netgear-sms-gateway` - Minimal write access
@@ -52,8 +58,9 @@ The service includes security hardening:
 ### SMS Content
 
 - SMS messages may contain sensitive data (2FA codes, OTP tokens)
-- Stored in `/var/lib/netgear-sms-gateway/` with restricted permissions
-- Monthly rotation prevents unlimited log growth
+- Stored in `/var/lib/netgear-sms-gateway/`, whose permissions you set (see
+  Known Security Considerations below)
+- One archive file per month keeps a single file from growing without bound; nothing deletes old files, so prune them yourself if disk space matters
 - Consider encrypting state directory if storing on shared systems
 
 ### Telegram Bot
@@ -67,20 +74,33 @@ The service includes security hardening:
 
 ### Modem API Authentication
 
-- Netgear LM1200 uses HTTP Basic Auth (not HTTPS)
-- Admin password transmitted in base64-encoded form
-- Mitigation: Ensure modem is only accessible on trusted local network
+- The admin interface serves plain HTTP, with no TLS option
+- The poller reads `secToken` from `/api/model.json` and posts it together with
+  the admin password as form fields to `/Forms/config`, then reuses the session
+  cookie. The password crosses the LAN unencrypted on every polling cycle
+- Mitigation: keep the modem reachable only from a trusted local network. The
+  trust anchor here is the network, not the transport
 
 ### SMS Storage
 
-- SMS content stored in plaintext JSON files
-- Mitigation: Filesystem permissions (`chmod 700` on state directory)
-- Future: Consider encrypted storage option
+- SMS bodies are stored in plaintext JSON unless
+  `SMS_ENCRYPTION_ENABLED=true` turns on Fernet encryption (AES-128-CBC plus
+  HMAC-SHA256), available since 1.2.0 and off by default. See
+  [docs/ENCRYPTION.md](docs/ENCRYPTION.md)
+- Encryption covers the archive and the `latest_sms` field of the state file. It
+  does not cover the Telegram message: the wrapper decrypts before sending
+- The poller creates the state directory without an explicit mode, so its
+  permissions follow the umask of whoever creates it, and `scripts/install.sh`
+  sets the owner but not the mode. On a shared host, `chmod 700` it yourself
 
 ## Security Changelog
+
+### v1.2.0 (2026-01-22, released as the `v1.2.1` tag)
+
+- Optional Fernet encryption for stored SMS bodies (`SMS_ENCRYPTION_ENABLED`)
 
 ### v1.0.0 (2025-12-30)
 
 - Initial release with systemd hardening
-- Secure credential storage in `/etc/`
+- Credential storage in `/etc/netgear-sms-gateway/config.env`, mode 600
 - Rate limiting for Telegram forwarding

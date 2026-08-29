@@ -2,7 +2,7 @@
 
 ## Overview
 
-Netgear LM1200 SMS Gateway supports **optional** AES-256 encryption for SMS content stored on disk.
+Netgear LM1200 SMS Gateway supports **optional** authenticated encryption for SMS content stored on disk, via Fernet from the `cryptography` package.
 
 **Requirements**: `pip install cryptography>=42.0.0` (or `apt install python3-cryptography`)
 
